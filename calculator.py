@@ -16,8 +16,14 @@ st.sidebar.header("👥 Scale & Scope")
 num_employees = st.sidebar.number_input("Number of Employees", min_value=1, value=10, step=1)
 
 st.sidebar.header("💰 Individual Cost")
-annual_salary = st.sidebar.number_input(f"Avg. Annual Salary ({symbol})", value=120000, step=5000)
-fringe_rate = st.sidebar.slider("Fringe Benefits (%)", 0, 50, 25) / 100
+
+# The format="%d" adds the thousands separator (e.g., 120,000)
+annual_salary = st.sidebar.number_input(
+    f"Avg. Annual Salary ({symbol})", 
+    value=120000, 
+    step=5000,
+    format="%d" 
+)
 
 st.sidebar.header("⏱️ Time & Efficiency")
 work_days = st.sidebar.number_input("Annual Work Days", value=220)
