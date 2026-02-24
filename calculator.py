@@ -13,15 +13,24 @@ currency_choice = st.sidebar.selectbox("Select Currency", list(currency_map.keys
 symbol = currency_map[currency_choice]
 
 st.sidebar.header("👥 Scale & Scope")
-num_employees = st.sidebar.number_input("Number of Employees", min_value=1, value=10, step=1)
+num_employees = st.sidebar.number_input(
+    "Number of Employees", 
+    min_value=1, 
+    value=10, 
+    step=1,
+    format="%d"
+)
 
 st.sidebar.header("💰 Individual Cost")
 
-# The format="%d" adds the thousands separator (e.g., 120,000)
+# We use %0.0f to tell Streamlit to treat it as a number with a thousands separator
+# but zero decimal places.
 annual_salary = st.sidebar.number_input(
     f"Avg. Annual Salary ({symbol})", 
+    min_value=0,
+    max_value=1000000,
     value=120000, 
-    step=5000,
+    step=1000,
     format="%d" 
 )
 
