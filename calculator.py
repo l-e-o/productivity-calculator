@@ -58,4 +58,21 @@ if st.button("Generate Detailed Report"):
 
     with col3:
         # FTE usually stays as a float, but we'll ensure 2 decimal precision
-        st.metric("Capacity Reclaimed", f"{total_fte_
+        st.metric("Capacity Reclaimed", f"{total_fte_recovered:,.2f} FTE")
+        st.write(f"{hours_saved_dept:,.1f} Total Hours Saved")
+
+    # --- Business Case Summary ---
+    st.subheader("📝 Executive Summary")
+    summary = (
+        f"By reducing current unproductive time by {improvement_pct*100:.0f}%, "
+        f"the organization will reclaim {hours_saved_dept:,.0f} hours annually. "
+        f"This represents a total cost avoidance of {format_currency(total_savings)} "
+        f"and increases internal capacity by {total_fte_recovered:,.2f} full-time equivalent (FTE) staff."
+    )
+    st.info(summary)
+    
+    # Text area for easy copying
+    st.text_area("Copy for your business case:", value=summary, height=100)
+
+else:
+    st.info("Adjust the inputs in the sidebar and click the button to calculate.")
