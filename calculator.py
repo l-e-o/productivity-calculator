@@ -63,15 +63,33 @@ if st.button("Generate Productivity Report"):
     with col3:
         st.metric("Capacity Reclaimed", f"{total_fte_recovered:,.2f} FTE")
 
-    # --- Chart Visualization ---
+    # --- Chart Visualization (Improved with Plotly) ---
     st.subheader("📊 Annual Hours Allocation")
     
-    chart_data = pd.DataFrame({
-        "Category": ["Core Productive Time", "Reclaimed Time (Savings)", "Remaining Unproductive"],
-        "Hours": [hours_productive, hours_saved, hours_remaining_waste]
-    }).set_index("Category")
-    
-    st.bar_chart(chart_data)
+    import plotly.graph_objects as go
+
+    # Prepare data
+    categories = ["Core Productive Time", "Reclaimed Time (Savings)", "Remaining Unproductive"]
+    values = [hours_productive, hours_saved, hours_remaining_waste]
+    colors = ['#2ca02c', '#1f77b4', '#d62728']  # Green, Blue, Red
+
+    fig = go.Figure(go.Bar(
+        x=values,
+        y=categories,
+        orientation='h',
+        marker_color=colors,
+        text=[f"{v:,.0f} hrs" for v in values],
+        textposition='auto',
+    ))
+
+    fig.update_layout(
+        xaxis_title="Total Annual Hours (Departmental)",
+        yaxis=dict(autorange="reversed"), # Puts 'Core Productive' at the top
+        margin=dict(l=20, r=20, t=20, b=20),
+        height=300
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
     
 
     # --- Summary Section ---
