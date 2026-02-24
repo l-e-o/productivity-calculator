@@ -52,12 +52,11 @@ if st.button("Generate Detailed Report"):
         st.caption(f"Based on {num_employees} Headcount")
 
     with col2:
-        # Using format_currency for the delta/display
         st.metric("Total Annual Savings", format_currency(total_savings))
         st.write(f"Labor Rate: {format_currency(hourly_rate)}/hr")
 
     with col3:
-        # FTE usually stays as a float, but we'll ensure 2 decimal precision
+        # Check this line carefully for the closing }
         st.metric("Capacity Reclaimed", f"{total_fte_recovered:,.2f} FTE")
         st.write(f"{hours_saved_dept:,.1f} Total Hours Saved")
 
