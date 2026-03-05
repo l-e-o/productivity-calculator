@@ -18,7 +18,7 @@ with tab1:
     
     with col1:
         industry = st.selectbox("Industry Vertical", ["Logistics Service Provider (LSP)", "Manufacturing", "Retail"])
-        num_employees = st.number_input("Headcount in Scope", min_value=1, value=50)
+        num_employees = st.number_input("Total Headcount in Scope (Beneficiaries)", min_value=1, value=50)
         annual_salary = st.number_input("Avg. Annual Salary ($)", value=95000, step=5000)
         fringe_rate = st.slider("Burden Rate (Super/Tax/Insurance %)", 0, 50, 28) / 100
         
@@ -44,86 +44,103 @@ with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        initial_setup = st.number_input("External Fees (Software/Consulting)", value=75000)
-        recurring_fee = st.number_input("Annual Recurring SaaS/Support Fee", value=15000)
-        # --- NEW: Time Horizon Slider ---
-        analysis_years = st.slider("ROI Analysis Horizon (Years)", min_value=2, max_value=10, value=3)
+        initial_setup = st.number_input("External Fees (Implementation/Consulting)", value=500000)
+        recurring_fee = st.number_input("Annual SaaS Fee (Paid in Advance)", value=1200000)
+        analysis_years = st.slider("ROI Analysis Horizon (Years)", min_value=2, max_value=10, value=5)
+        escalation_rate = st.slider("Annual Labor Escalation/Inflation (%)", 0, 10, 3) / 100
     
     with c2:
+        st.subheader("Internal Project Team (Year 1 Implementation)")
+        key_users = st.number_input("Number of Key Users / SMEs", min_value=1, value=5, step=1)
+        
         impl_intensity = st.select_slider(
             "Internal Implementation Intensity",
             options=["Low", "Medium", "High"],
             value="Medium"
         )
-        intensity_map = {"Low": 0.5, "Medium": 1.0, "High": 1.5}
-        internal_resource_cost = (initial_setup + recurring_fee) * intensity_map[impl_intensity]
-        st.info(f"**Internal Labor Value:** ${internal_resource_cost:,.0f}")
+        
+        intensity_map = {"Low": 250, "Medium": 500, "High": 750}
+        burdened_cost_pp = annual_salary * (1 + fringe_rate)
+        hourly_rate_pp = burdened_cost_pp / (work_days * daily_hours)
+        
+        internal_labor_invest = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
+        st.info(f"**Year 1 Internal Labor Value:** ${internal_labor_invest:,.0f}")
         
         wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10) / 100
 
-    total_upfront = initial_setup + internal_resource_cost
+    y1_investment_total = initial_setup + internal_labor_invest + recurring_fee
 
 with tab3:
-    # --- DYNAMIC MATH ENGINE ---
-    burdened_cost_pp = annual_salary * (1 + fringe_rate)
-    hourly_rate = burdened_cost_pp / total_annual_hours_pp
+    # --- MATH ENGINE ---
+    savings_list = []
+    investments_list = []
     
-    # 100% Potential Annual Saving
-    max_annual_saving = (total_annual_hours_pp * waste_pct * num_employees) * improvement_target * hourly_rate
-    
-    # Build Time-Series Data
-    years = [f"Year {i}" if i > 0 else "Year 0 (Now)" for i in range(analysis_years + 1)]
-    investments = [-total_upfront] + ([-recurring_fee] * analysis_years)
-    
-    # Benefit Ramp-up logic: Yr1=40%, Yr2=85%, Yr3+=100%
-    savings = [0]
     for yr in range(1, analysis_years + 1):
+        current_yr_hourly_rate = hourly_rate_pp * ((1 + escalation_rate) ** (yr - 1))
+        yr_max_saving = (total_annual_hours_pp * waste_pct * num_employees) * improvement_target * current_yr_hourly_rate
+        
         if yr == 1:
-            savings.append(max_annual_saving * 0.40)
-        elif yr == 2:
-            savings.append(max_annual_saving * 0.85)
+            savings_list.append(0) # Year 1 Implementation
+            investments_list.append(-y1_investment_total)
         else:
-            savings.append(max_annual_saving * 1.00)
+            savings_list.append(yr_max_saving) # Steady State Starts Year 2
+            investments_list.append(-recurring_fee)
+
+    years = [f"Year {i}" for i in range(1, analysis_years + 1)]
 
     df = pd.DataFrame({
         "Period": years,
-        "Investment": investments,
-        "Gross Savings": savings
+        "Investment": investments_list,
+        "Gross Savings": savings_list
     })
+    
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
 
     # --- THE EXECUTIVE DASHBOARD ---
-    st.header(f"Projected Impact Over {analysis_years} Years")
+    st.header(f"Projected Impact: {industry}")
     
-    npv = sum(val / (1 + wacc)**i for i, val in enumerate(df["Net Cash Flow"]))
-    payback_months = (total_upfront / (savings[1] / 12)) if savings[1] > 0 else 0
-    fte_reclaimed = (max_annual_saving / burdened_cost_pp)
-
+    npv = sum(val / (1 + wacc)**(i+1) for i, val in enumerate(df["Net Cash Flow"]))
+    steady_state = savings_list[-1]
+    
+    # Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric(f"{analysis_years}-Year NPV", f"${npv:,.0f}")
-    m2.metric("Discounted Payback", f"{payback_months:.1f} Months")
-    m3.metric("Capacity Reclaimed", f"{fte_reclaimed:.1f} FTE")
-    m4.metric("Steady State Saving", f"${max_annual_saving:,.0f}/yr")
+    m1.caption(f"Terminal Year Saving: ${steady_state:,.0f}/yr")
+    
+    # Calculate Year 2 (First Year of Benefits) for clarity
+    m2.metric("Year 2 Base Saving", f"${savings_list[1]:,.0f}")
+    m3.metric("Year 1 Cash Requirement", f"${y1_investment_total:,.0f}")
+    m4.metric("Inflation (Labor Escalation)", f"{escalation_rate*100:.1f}%")
 
-    # J-Curve Chart
-    st.subheader("Value Realization Path (Cumulative Cash Flow)")
+    # --- PIVOTABLE GRAPH LOGIC ---
+    st.divider()
+    graph_view = st.radio("Select Visualization View:", ["Cumulative Cash Flow (J-Curve)", "Annual Net Cash Flow"], horizontal=True)
+
     fig = go.Figure()
+
+    if graph_view == "Cumulative Cash Flow (J-Curve)":
+        y_data = df["Cumulative Cash Flow"]
+        title = "Value Realization Path (Cumulative Position)"
+        fill = 'tozeroy'
+    else:
+        y_data = df["Net Cash Flow"]
+        title = "Annual Operational Performance (Net Cash Flow)"
+        fill = None
+
     fig.add_trace(go.Scatter(
-        x=df["Period"], y=df["Cumulative Cash Flow"],
+        x=df["Period"], y=y_data,
         mode='lines+markers', line=dict(color='#1f77b4', width=4),
-        fill='tozeroy', name="Cumulative Net Position"
+        fill=fill, name="Net Position"
     ))
-    fig.update_layout(yaxis_title="Net Position ($)", template="plotly_white", height=400)
+    
+    fig.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.3)
+    fig.update_layout(title=title, yaxis_title="USD ($)", template="plotly_white", height=450)
     st.plotly_chart(fig, use_container_width=True)
-    
-    
 
     # Detailed Table
     st.subheader("Financial Detail Table")
     st.table(df.style.format("${:,.0f}", subset=["Investment", "Gross Savings", "Net Cash Flow", "Cumulative Cash Flow"]))
 
-    # Summary Text
-    st.subheader("📝 Executive Summary")
-    st.info(f"Over a **{analysis_years}-year** horizon, this initiative delivers a Net Present Value of **${npv:,.0f}**. "
-            f"The steady-state annual savings reach **${max_annual_saving:,.0f}**, achieving full maturity by Year 3.")
+    st.info(f"**Logic Note:** Savings commence in Year 2. The terminal steady-state value of **${steady_state:,.0f}** in Year {analysis_years} "
+            f"includes a compounded **{escalation_rate*100:.1f}%** annual labor escalation.")
