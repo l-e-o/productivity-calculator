@@ -18,27 +18,29 @@ with tab1:
     
     with col1:
         industry = st.selectbox("Industry Vertical", ["Logistics Service Provider (LSP)", "Manufacturing", "Retail"])
-        num_employees = st.number_input("Total Headcount in Scope (Beneficiaries)", min_value=1, value=50)
+        num_employees = st.number_input("Total Headcount in Scope", min_value=1, value=50)
         annual_salary = st.number_input("Avg. Annual Salary ($)", value=95000, step=5000)
         fringe_rate = st.slider("Burden Rate (Super/Tax/Insurance %)", 0, 50, 28) / 100
+        burdened_cost_pp = annual_salary * (1 + fringe_rate)
         
     with col2:
         work_days = st.number_input("Working Days / Year", value=220)
         daily_hours = st.number_input("Standard Productive Hours / Day", value=7.5)
+        total_annual_hours_pp = work_days * daily_hours
+        hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
         
         st.divider()
-        input_method = st.radio("Define Waste Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True)
-        total_annual_hours_pp = work_days * daily_hours
+        input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True)
         
         if input_method == "Hours per Week":
-            waste_hrs_pw = st.number_input("Identified Waste (Hrs/Week/Person)", value=8.0, step=0.5)
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Week/Person)", value=8.0, step=0.5)
             weeks_per_year = work_days / 5
-            waste_pct = (waste_hrs_pw * weeks_per_year) / total_annual_hours_pp
+            baseline_waste_pct = (baseline_waste_hrs_pw * weeks_per_year) / total_annual_hours_pp
         else:
-            waste_pct = st.slider("Estimated Unproductive Time (%)", 0, 100, 20) / 100
-            waste_hrs_pw = (waste_pct * total_annual_hours_pp) / (work_days / 5)
+            baseline_waste_pct = st.slider("Inefficiency Percentage (%)", 0, 100, 20) / 100
+            baseline_waste_hrs_pw = (baseline_waste_pct * total_annual_hours_pp) / (work_days / 5)
 
-        improvement_target = st.slider("Target Efficiency Gain (%)", 0, 100, 50) / 100
+        improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 50) / 100
 
 with tab2:
     st.header("2. Investment & Time Horizon")
@@ -47,100 +49,79 @@ with tab2:
         initial_setup = st.number_input("External Fees (Implementation/Consulting)", value=500000)
         recurring_fee = st.number_input("Annual SaaS Fee (Paid in Advance)", value=1200000)
         analysis_years = st.slider("ROI Analysis Horizon (Years)", min_value=2, max_value=10, value=5)
-        escalation_rate = st.slider("Annual Labor Escalation/Inflation (%)", 0, 10, 3) / 100
+        escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3) / 100
     
     with c2:
-        st.subheader("Internal Project Team (Year 1 Implementation)")
+        st.subheader("Internal Project Team (Year 1 Only)")
         key_users = st.number_input("Number of Key Users / SMEs", min_value=1, value=5, step=1)
-        
-        impl_intensity = st.select_slider(
-            "Internal Implementation Intensity",
-            options=["Low", "Medium", "High"],
-            value="Medium"
-        )
+        impl_intensity = st.select_slider("Implementation Intensity", options=["Low", "Medium", "High"], value="Medium")
         
         intensity_map = {"Low": 250, "Medium": 500, "High": 750}
-        burdened_cost_pp = annual_salary * (1 + fringe_rate)
-        hourly_rate_pp = burdened_cost_pp / (work_days * daily_hours)
-        
         internal_labor_invest = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
         st.info(f"**Year 1 Internal Labor Value:** ${internal_labor_invest:,.0f}")
-        
         wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10) / 100
 
     y1_investment_total = initial_setup + internal_labor_invest + recurring_fee
 
 with tab3:
-    # --- MATH ENGINE ---
-    savings_list = []
-    investments_list = []
+    st.header("📈 ROI Report & Targeter")
     
+    st.subheader("🎯 Breakeven Targeter")
+    target_mode = st.toggle("Enable Reverse Target Mode")
+    
+    calc_waste_pct = baseline_waste_pct
+    calc_waste_hrs = baseline_waste_hrs_pw
+
+    if target_mode:
+        target_years = st.number_input("Target Years to Breakeven (Decimal)", min_value=1.1, max_value=float(analysis_years), value=3.5, step=0.1)
+        total_cost_to_recover = y1_investment_total + (recurring_fee * (target_years - 1))
+        req_annual_saving = total_cost_to_recover / (target_years - 1)
+        
+        esc_hourly_rate = hourly_rate_pp * (1 + escalation_rate)
+        calc_waste_pct = req_annual_saving / (total_annual_hours_pp * num_employees * improvement_target * esc_hourly_rate)
+        calc_waste_hrs = (calc_waste_pct * total_annual_hours_pp) / (work_days / 5)
+        st.success(f"**Target Identified:** To break even in {target_years} years, address **{calc_waste_hrs:.2f} hours** per person/week.")
+
+    # MATH ENGINE
+    savings, investments = [], []
     for yr in range(1, analysis_years + 1):
-        current_yr_hourly_rate = hourly_rate_pp * ((1 + escalation_rate) ** (yr - 1))
-        yr_max_saving = (total_annual_hours_pp * waste_pct * num_employees) * improvement_target * current_yr_hourly_rate
+        curr_rate = hourly_rate_pp * ((1 + escalation_rate) ** (yr - 1))
+        yr_saving_calc = (total_annual_hours_pp * calc_waste_pct * num_employees) * improvement_target * curr_rate
         
         if yr == 1:
-            savings_list.append(0) # Year 1 Implementation
-            investments_list.append(-y1_investment_total)
+            savings.append(0)
+            investments.append(-y1_investment_total)
         else:
-            savings_list.append(yr_max_saving) # Steady State Starts Year 2
-            investments_list.append(-recurring_fee)
-
-    years = [f"Year {i}" for i in range(1, analysis_years + 1)]
-
-    df = pd.DataFrame({
-        "Period": years,
-        "Investment": investments_list,
-        "Gross Savings": savings_list
-    })
+            savings.append(yr_saving_calc)
+            investments.append(-recurring_fee)
     
+    df = pd.DataFrame({"Period": [f"Year {i}" for i in range(1, analysis_years + 1)], "Investment": investments, "Gross Savings": savings})
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
+    
+    total_horizon_investment = abs(df["Investment"].sum())
+    npv_val = sum(val / (1 + wacc)**(i+1) for i, val in enumerate(df['Net Cash Flow']))
+    
+    # CALCULATE FTE EQUIVALENT (Steady State Year 2)
+    # Reclaimed FTE = Annual Saving / Burdened Salary (at Year 2 escalation)
+    fte_equiv = savings[1] / (burdened_cost_pp * (1 + escalation_rate))
 
-    # --- THE EXECUTIVE DASHBOARD ---
-    st.header(f"Projected Impact: {industry}")
-    
-    npv = sum(val / (1 + wacc)**(i+1) for i, val in enumerate(df["Net Cash Flow"]))
-    steady_state = savings_list[-1]
-    
-    # Metrics
+    # DASHBOARD METRICS
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric(f"{analysis_years}-Year NPV", f"${npv:,.0f}")
-    m1.caption(f"Terminal Year Saving: ${steady_state:,.0f}/yr")
-    
-    # Calculate Year 2 (First Year of Benefits) for clarity
-    m2.metric("Year 2 Base Saving", f"${savings_list[1]:,.0f}")
-    m3.metric("Year 1 Cash Requirement", f"${y1_investment_total:,.0f}")
-    m4.metric("Inflation (Labor Escalation)", f"{escalation_rate*100:.1f}%")
+    m1.metric("Total Investment (TCO)", f"${total_horizon_investment:,.0f}")
+    m2.metric("Annual Saving (Year 2)", f"${savings[1]:,.0f}")
+    m3.metric("FTE Equivalent Reclaimed", f"{fte_equiv:.1f} FTE", help="Total full-time capacity recovered across the organization.")
+    m4.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
 
-    # --- PIVOTABLE GRAPH LOGIC ---
     st.divider()
-    graph_view = st.radio("Select Visualization View:", ["Cumulative Cash Flow (J-Curve)", "Annual Net Cash Flow"], horizontal=True)
 
+    graph_view = st.radio("View:", ["Cumulative Cash Flow", "Annual Net Cash Flow"], horizontal=True)
     fig = go.Figure()
-
-    if graph_view == "Cumulative Cash Flow (J-Curve)":
-        y_data = df["Cumulative Cash Flow"]
-        title = "Value Realization Path (Cumulative Position)"
-        fill = 'tozeroy'
-    else:
-        y_data = df["Net Cash Flow"]
-        title = "Annual Operational Performance (Net Cash Flow)"
-        fill = None
-
-    fig.add_trace(go.Scatter(
-        x=df["Period"], y=y_data,
-        mode='lines+markers', line=dict(color='#1f77b4', width=4),
-        fill=fill, name="Net Position"
-    ))
-    
+    y_data = df["Cumulative Cash Flow"] if "Cumulative" in graph_view else df["Net Cash Flow"]
+    fig.add_trace(go.Scatter(x=df["Period"], y=y_data, mode='lines+markers', line=dict(color='#1f77b4', width=4), fill='tozeroy' if "Cumulative" in graph_view else None))
     fig.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.3)
-    fig.update_layout(title=title, yaxis_title="USD ($)", template="plotly_white", height=450)
+    fig.update_layout(template="plotly_white", height=400)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Detailed Table
     st.subheader("Financial Detail Table")
     st.table(df.style.format("${:,.0f}", subset=["Investment", "Gross Savings", "Net Cash Flow", "Cumulative Cash Flow"]))
-
-    st.info(f"**Logic Note:** Savings commence in Year 2. The terminal steady-state value of **${steady_state:,.0f}** in Year {analysis_years} "
-            f"includes a compounded **{escalation_rate*100:.1f}%** annual labor escalation.")
