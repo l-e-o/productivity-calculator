@@ -46,8 +46,8 @@ with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        initial_setup = st.number_input("External Fees (Implementation/Consulting)", value=500000)
-        recurring_fee = st.number_input("Annual SaaS Fee (Paid in Advance)", value=1200000)
+        initial_setup = st.number_input("Consulting Services (Implementation Fees)", value=500000)
+        recurring_fee = st.number_input("Annual Subscription (SaaS) Fees", value=1200000)
         analysis_years = st.slider("ROI Analysis Horizon (Years)", min_value=2, max_value=10, value=5)
         escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3) / 100
     
@@ -57,18 +57,17 @@ with tab2:
         impl_intensity = st.select_slider("Implementation Intensity", options=["Low", "Medium", "High"], value="Medium")
         
         intensity_map = {"Low": 250, "Medium": 500, "High": 750}
-        internal_labor_invest = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
-        st.info(f"**Year 1 Internal Labor Value:** ${internal_labor_invest:,.0f}")
+        client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
+        st.info(f"**Calculated Client Investment:** ${client_internal_investment:,.0f}")
         wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10) / 100
 
-    y1_investment_total = initial_setup + internal_labor_invest + recurring_fee
+    y1_investment_total = initial_setup + client_internal_investment + recurring_fee
 
 with tab3:
     st.header("📈 ROI Report & Targeter")
     
-    st.subheader("🎯 Breakeven Targeter")
+    # --- Reverse Targeter Logic ---
     target_mode = st.toggle("Enable Reverse Target Mode")
-    
     calc_waste_pct = baseline_waste_pct
     calc_waste_hrs = baseline_waste_hrs_pw
 
@@ -76,18 +75,16 @@ with tab3:
         target_years = st.number_input("Target Years to Breakeven (Decimal)", min_value=1.1, max_value=float(analysis_years), value=3.5, step=0.1)
         total_cost_to_recover = y1_investment_total + (recurring_fee * (target_years - 1))
         req_annual_saving = total_cost_to_recover / (target_years - 1)
-        
         esc_hourly_rate = hourly_rate_pp * (1 + escalation_rate)
         calc_waste_pct = req_annual_saving / (total_annual_hours_pp * num_employees * improvement_target * esc_hourly_rate)
         calc_waste_hrs = (calc_waste_pct * total_annual_hours_pp) / (work_days / 5)
         st.success(f"**Target Identified:** To break even in {target_years} years, address **{calc_waste_hrs:.2f} hours** per person/week.")
 
-    # MATH ENGINE
+    # --- Calculation Loop ---
     savings, investments = [], []
     for yr in range(1, analysis_years + 1):
         curr_rate = hourly_rate_pp * ((1 + escalation_rate) ** (yr - 1))
         yr_saving_calc = (total_annual_hours_pp * calc_waste_pct * num_employees) * improvement_target * curr_rate
-        
         if yr == 1:
             savings.append(0)
             investments.append(-y1_investment_total)
@@ -99,22 +96,33 @@ with tab3:
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
     
-    total_horizon_investment = abs(df["Investment"].sum())
-    npv_val = sum(val / (1 + wacc)**(i+1) for i, val in enumerate(df['Net Cash Flow']))
+    # --- Investment Area Breakdown ---
+    total_subscription = recurring_fee * analysis_years
+    total_consulting = initial_setup
+    total_client_invest = client_internal_investment
+    total_tco = total_subscription + total_consulting + total_client_invest
     
-    # CALCULATE FTE EQUIVALENT (Steady State Year 2)
-    # Reclaimed FTE = Annual Saving / Burdened Salary (at Year 2 escalation)
     fte_equiv = savings[1] / (burdened_cost_pp * (1 + escalation_rate))
+    npv_val = sum(val / (1 + wacc)**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
-    # DASHBOARD METRICS
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Investment (TCO)", f"${total_horizon_investment:,.0f}")
-    m2.metric("Annual Saving (Year 2)", f"${savings[1]:,.0f}")
-    m3.metric("FTE Equivalent Reclaimed", f"{fte_equiv:.1f} FTE", help="Total full-time capacity recovered across the organization.")
-    m4.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
+    # --- Dashbord Metrics ---
+    st.subheader("Total Investment Summary (TCO)")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Subscription Fees", f"${total_subscription:,.0f}")
+    c2.metric("Consulting Services", f"${total_consulting:,.0f}")
+    c3.metric("Client Investment", f"${total_client_invest:,.0f}")
+    c4.metric("TOTAL TCO", f"${total_tco:,.0f}")
+
+    st.divider()
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Annual Saving (Year 2)", f"${savings[1]:,.0f}")
+    m2.metric("FTE Equivalent Reclaimed", f"{fte_equiv:.1f} FTE")
+    m3.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
 
     st.divider()
 
+    # --- Visuals & Table ---
     graph_view = st.radio("View:", ["Cumulative Cash Flow", "Annual Net Cash Flow"], horizontal=True)
     fig = go.Figure()
     y_data = df["Cumulative Cash Flow"] if "Cumulative" in graph_view else df["Net Cash Flow"]
