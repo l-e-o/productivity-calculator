@@ -34,7 +34,7 @@ with tab1:
             help="Contextualizes the business environment and selects relevant productivity benchmarks."
         )
         
-        # DYNAMIC INDUSTRY GUIDANCE
+        # --- DYNAMIC INDUSTRY GUIDANCE ---
         if industry == "Retail":
             if investment_strategy == "New Solution":
                 st.info("**Retail (New):** Leakage: 15-25% (Manual siloes) | Target Gain: 40-60% (Full Automation)")
@@ -65,11 +65,14 @@ with tab1:
         st.divider()
         input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True)
         
+        # --- FIXED SYNCHRONIZED CALCULATION ---
         if input_method == "Hours per Week":
-            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=5.0, help="Hours lost per person per week.")
-            baseline_waste_pct = (baseline_waste_hrs_pw * 52) / total_annual_hours_pp
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=7.5, help="Hours lost per person per week.")
+            weekly_productive_hours = daily_hours * 5
+            baseline_waste_pct = baseline_waste_hrs_pw / weekly_productive_hours
         else:
-            baseline_waste_pct = st.slider("Inefficiency Percentage (%)", 0, 100, 20, help="Portion of time consumed by friction.")
+            baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, 20, help="Portion of time consumed by friction.")
+            baseline_waste_pct = baseline_waste_pct_input / 100
         
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100, help="Efficiency recovered by AI.")
 
@@ -128,7 +131,7 @@ with tab2:
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (FINAL NARRATIVE UPDATE)
+# TAB 3: ROI REPORT (FULL NARRATIVE RESTORED & MATH LOCKED)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
@@ -159,6 +162,7 @@ with tab3:
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
 
+    # Calculation metrics for report display
     total_sub_cost = y1_recurring + (steady_state_recurring * (analysis_years - 1))
     total_tco = total_sub_cost + initial_setup + client_internal_investment
     annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100 if improvement_target > 1 else improvement_target) * num_employees
@@ -193,7 +197,7 @@ with tab3:
     v6.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
     st.divider()
 
-    # --- BOARD-LEVEL EXECUTIVE SUMMARY (LOCKED WITH FINAL NARRATIVE FIX) ---
+    # --- BOARD-LEVEL EXECUTIVE SUMMARY (RESTORED FULL CONTENT) ---
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
     npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
     recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
@@ -210,7 +214,6 @@ with tab3:
     else:
         analysis_logic = f'<div style="color:#2E7D32; margin-bottom:20px;"><b>✅ Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
 
-    # UPDATED PROJECT OVERVIEW SECTION
     summary_html = (
         f'<div style="border:1px solid rgba(128,128,128,0.3); padding:30px; border-radius:10px; font-family:\'Segoe UI\',sans-serif; line-height:1.8;">'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Strategic Project Overview</b><br>'
@@ -236,7 +239,7 @@ with tab3:
         *Reference: www.blueyonder.com*
         """)
     
-    chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Flow"], horizontal=True, help="Toggle between cumulative ROI and annual cash flow.")
+    chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Flow"], horizontal=True, help="Toggle visualizations.")
     fig = go.Figure()
     if chart_view == "Cumulative Path":
         fig.add_trace(go.Scatter(x=df["Period"], y=df["Cumulative Cash Flow"], mode='lines+markers', line=dict(color='#1f77b4', width=4), fill='tozeroy'))
