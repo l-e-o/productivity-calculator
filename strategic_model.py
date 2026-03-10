@@ -14,7 +14,7 @@ st.markdown("Quantifying the multi-year value of operational transformation.")
 tab1, tab2, tab3 = st.tabs(["📊 Baseline & Industry", "💰 Investment & Horizon", "📈 ROI Report"])
 
 # =================================================================
-# TAB 1: OPERATIONAL STRATEGY (RESTORED HELP TOOLTIPS)
+# TAB 1: OPERATIONAL STRATEGY (LOCKED STRUCTURE & HELP TOOLTIPS)
 # =================================================================
 with tab1:
     st.header("1. Operational Strategy")
@@ -51,90 +51,50 @@ with tab1:
             else:
                 st.info("**Mfg (Upgrade):** Leakage: 7-12% (Scenario friction) | Target Gain: 15-25% (Cognitive Uplift)")
 
-        num_employees = st.number_input(
-            "Total Headcount in Scope", 
-            min_value=1, value=105,
-            help="The specific cohort of personnel interacting with the solution. Represents the total human 'surface area' for efficiency gains."
-        )
-        annual_salary = st.number_input(
-            "Avg. Annual Salary ($)", 
-            value=100000,
-            help="Average base salary for employees in scope. Acts as the foundation for the productivity dividend."
-        )
-        fringe_rate = st.slider(
-            "Burden Rate (%)", 0, 50, 20,
-            help="Total cost of employment above base salary (Super, Tax, Insurance). Please use the customer's actual regional data."
-        )
+        num_employees = st.number_input("Total Headcount in Scope", min_value=1, value=105, help="Staff interacting with the solution.")
+        annual_salary = st.number_input("Avg. Annual Salary ($)", value=100000, help="Average base salary.")
+        fringe_rate = st.slider("Burden Rate (%)", 0, 50, 20, help="Local statutory costs (Super, Tax, etc.).")
         burdened_cost_pp = annual_salary * (1 + fringe_rate/100)
     
     with col2:
-        work_days = st.number_input(
-            "Working Days / Year", 
-            value=220,
-            help="Standardized annual working days adjusted for public holidays and annual leave."
-        )
-        daily_hours = st.number_input(
-            "Standard Productive Hours / Day", 
-            value=7.50,
-            help="Actual time spent on core operational tasks, excluding lunch and administrative overhead."
-        )
+        work_days = st.number_input("Working Days / Year", value=220, help="Standardized annual working days.")
+        daily_hours = st.number_input("Standard Productive Hours / Day", value=7.50, help="Actual time spent on core tasks.")
         total_annual_hours_pp = work_days * daily_hours
         hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
         
         st.divider()
-        input_method = st.radio(
-            "Define Inefficiency Basis:", 
-            ["Hours per Week", "Percentage of Total Time"], 
-            horizontal=True,
-            help="Select the metric that best captures current latent manual friction (e.g., data reconciliation)."
-        )
+        input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True)
         
         if input_method == "Hours per Week":
-            baseline_waste_hrs_pw = st.number_input(
-                "Productive Inefficiency (Hrs/Wk/Person)", 
-                value=5.0,
-                help="Estimated hours per week each person loses to manual, low-value tasks."
-            )
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=5.0, help="Hours lost per person per week.")
             baseline_waste_pct = (baseline_waste_hrs_pw * 52) / total_annual_hours_pp
         else:
-            baseline_waste_pct = st.slider(
-                "Inefficiency Percentage (%)", 
-                0, 100, 20,
-                help="The portion of a user's total productive time currently consumed by manual process friction."
-            )
+            baseline_waste_pct = st.slider("Inefficiency Percentage (%)", 0, 100, 20, help="Portion of time consumed by friction.")
         
-        improvement_target = st.slider(
-            "Target Efficiency Gain (%)", 
-            1, 100, 100,
-            help="The percentage of identified inefficiency recovered by AI-driven work directing."
-        )
+        improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100, help="Efficiency recovered by AI.")
 
 # =================================================================
-# TAB 2: INVESTMENT & HORIZON (RESTORED HELP TOOLTIPS)
+# TAB 2: INVESTMENT & HORIZON (LOCKED STRUCTURE & HELP TOOLTIPS)
 # =================================================================
 with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        solution_name = st.text_input(
-            "Solution Name", 
-            value="Blue Yonder Cognitive Solution",
-            help="Enter the specific solution or module being modeled for dynamic narrative integration."
-        )
+        solution_name = st.text_input("Solution Name", value="Blue Yonder Cognitive Solution", help="Specific module name.")
         
         if investment_strategy == "Pre-existing Solution Upgrade":
-            curr_sub = st.number_input("Current Annual Subscription ($)", value=800000, help="Current annual spend on legacy Blue Yonder solution.")
-            future_sub = st.number_input("Future Annual Subscription ($)", value=1200000, help="Total annual spend for the new Cognitive solution.")
+            curr_sub = st.number_input("Current Annual Subscription ($)", value=800000, help="Current legacy spend.")
+            future_sub = st.number_input("Future Annual Subscription ($)", value=1200000, help="Total new Cognitive spend.")
             y1_recurring = future_sub - curr_sub
             steady_state_recurring = future_sub
         else:
-            y1_recurring = st.number_input("Annual SaaS Fees ($)", value=1200000, help="Total recurring software subscription cost.")
+            y1_recurring = st.number_input("Annual SaaS Fees ($)", value=1200000, help="Recurring subscription cost.")
             steady_state_recurring = y1_recurring
         
         st.divider()
-        initial_setup = st.number_input("Consulting Services Fees", value=500000, help="One-time professional services costs for implementation.")
-        analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 7, help="The multi-year period over which TCO and savings are evaluated.")
-        escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3, help="Projected annual increase in labor costs.")
+        initial_setup = st.number_input("Consulting Services Fees", value=500000, help="Implementation costs.")
+        analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 7, help="Evaluation period.")
+        escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3, help="Projected labor inflation.")
 
     with c2:
         st.divider()
@@ -153,26 +113,26 @@ with tab2:
                 st.session_state.last_unit = current_unit
 
         impl_unit = st.radio("Implementation Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration)
-        impl_duration = st.number_input(f"Duration ({impl_unit})", value=float(st.session_state.dur_key), key="dur_key", step=0.1, help="Time required for go-live. Savings are pro-rated during this period.")
+        impl_duration = st.number_input(f"Duration ({impl_unit})", value=float(st.session_state.dur_key), key="dur_key", step=0.1, help="Time to go-live.")
         impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
         
         st.subheader("Internal Team (Year 1)")
-        key_users = st.number_input("Number of Key Users", value=5, help="Internal SMEs dedicated to implementation.")
-        impl_intensity = st.select_slider("Intensity", options=["Low", "Medium", "High"], value="Medium", help="Reflects annual hours required from each SME (Low: 250h, Medium: 500h, High: 750h).")
+        key_users = st.number_input("Number of Key Users", value=5, help="Internal implementation SMEs.")
+        impl_intensity = st.select_slider("Intensity", options=["Low", "Medium", "High"], value="Medium", help="Hours required from SMEs.")
         intensity_map = {"Low": 250, "Medium": 500, "High": 750}
         client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
         st.info(f"Calculated Client Investment (Shadow Cost): ${client_internal_investment:,.0f}")
         
-        wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10, help="The hurdle rate used to discount future cash flows.")
+        wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10, help="Hurdle rate for NPV.")
 
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (RESTORED NARRATIVES & HELP TOOLTIPS)
+# TAB 3: ROI REPORT (LOCKED NARRATIVES & UPDATED LABELS)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
-    target_mode = st.toggle("Enable Reverse Target Mode", help="Identifies required productivity to reach a desired breakeven.")
+    target_mode = st.toggle("Enable Reverse Target Mode", help="Breakeven analysis.")
     final_calc_pct = baseline_waste_pct
     
     if target_mode:
@@ -207,11 +167,20 @@ with tab3:
     npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
-    i1, i2, i3, i4 = st.columns(4)
-    i1.metric("Total Subscription Cost", f"${total_sub_cost:,.0f}")
-    i2.metric("Consulting Services", f"${initial_setup:,.0f}")
-    i3.metric("Client Investment", f"${client_internal_investment:,.0f}")
-    i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
+    # --- UPDATED LABELS ---
+    if investment_strategy == "Pre-existing Solution Upgrade":
+        i1, i2, i3, i4, i5 = st.columns(5)
+        i1.metric("First Year Incremental Subscription", f"${y1_recurring:,.0f}")
+        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
+        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
+        i4.metric("Services", f"${initial_setup:,.0f}")
+        i5.metric("TOTAL TCO", f"${total_tco:,.0f}")
+    else:
+        i1, i2, i3, i4 = st.columns(4)
+        i1.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
+        i2.metric("Total Subscription", f"${total_sub_cost:,.0f}")
+        i3.metric("Services", f"${initial_setup:,.0f}")
+        i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
     st.divider()
 
     st.subheader("Efficiency & Value Realization")
@@ -226,7 +195,7 @@ with tab3:
     v6.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
     st.divider()
 
-    # --- BOARD-LEVEL EXECUTIVE SUMMARY (RESTORED FULL CONTENT) ---
+    # --- BOARD-LEVEL EXECUTIVE SUMMARY (LOCKED) ---
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
     npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
     recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
@@ -253,7 +222,7 @@ with tab3:
     )
     st.markdown(summary_html, unsafe_allow_html=True)
 
-    # --- GLOSSARY (RESTORED FULL CONTENT) ---
+    # --- GLOSSARY (LOCKED & RESTORED FULL CONTENT) ---
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
         st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money and the cost of capital.")
         st.info(f"""
