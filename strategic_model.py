@@ -78,7 +78,7 @@ with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        solution_name = st.text_input("Solution Name", value="Blue Yonder Cognitive Merchandise Financial Planning", help="Specific solution for narrative context.")
+        solution_name = st.text_input("Solution Name", value="Enter a solution name", help="Specific solution for narrative context.")
         initial_setup = st.number_input("Consulting Services Fees", value=500000, help="One-time services costs.")
         recurring_fee = st.number_input("Annual SaaS Fees", value=1200000, help="Yearly subscription fee.")
         analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 7)
