@@ -23,7 +23,7 @@ with tab1:
         industry = st.selectbox(
             "Industry Vertical", 
             ["Logistics Service Provider (LSP)", "Manufacturing", "Retail"], 
-            help="Contextualizes benchmarks. LSPs prioritize throughput; Retailers focus on availability and MFP."
+            help="Contextualizes benchmarks."
         )
         
         if industry == "Retail":
@@ -72,21 +72,40 @@ with tab1:
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100, help="Efficiency recovered by AI.")
 
 # =================================================================
-# TAB 2: INVESTMENT & HORIZON (FIXED CONVERSION LOGIC)
+# TAB 2: INVESTMENT & HORIZON (LOCKED STRUCTURE & HELP TOOLTIPS)
 # =================================================================
 with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        solution_name = st.text_input("Solution Name", value="Enter a solution name", help="Specific solution for narrative context.")
-        initial_setup = st.number_input("Consulting Services Fees", value=500000, help="One-time services costs.")
-        recurring_fee = st.number_input("Annual SaaS Fees", value=1200000, help="Yearly subscription fee.")
+        solution_name = st.text_input("Solution Name", value="Blue Yonder Cognitive Merchandise Financial Planning", help="Specific solution for narrative context.")
+        
+        sub_type = st.radio(
+            "Investment Type:", 
+            ["New Investment", "Incremental Upgrade"], 
+            horizontal=True,
+            help="New: Full fee applies. Incremental: Yr 1 uses uplift; Yr 2+ uses full future fee."
+        )
+        
+        if sub_type == "Incremental Upgrade":
+            curr_sub = st.number_input("Current Annual Subscription ($)", value=800000)
+            future_sub = st.number_input("Future Annual Subscription ($)", value=1200000)
+            # Calculations use uplift for Year 1, full for Year 2+
+            y1_recurring = future_sub - curr_sub
+            steady_state_recurring = future_sub
+        else:
+            y1_recurring = st.number_input("Annual SaaS Fees ($)", value=1200000)
+            steady_state_recurring = y1_recurring
+        
+        st.divider()
+        initial_setup = st.number_input("Consulting Services Fees", value=500000)
         analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 7)
         escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3) / 100
+
     with c2:
         st.divider()
         
-        # --- ROBUST DYNAMIC CONVERSION ---
+        # --- UNIT CONVERSION LOGIC (STRICT PRESERVATION) ---
         if 'dur_key' not in st.session_state:
             st.session_state.dur_key = 26.0
         if 'last_unit' not in st.session_state:
@@ -102,9 +121,7 @@ with tab2:
                 st.session_state.last_unit = current_unit
 
         impl_unit = st.radio("Implementation Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration)
-        
         impl_duration = st.number_input(f"Duration ({impl_unit})", value=float(st.session_state.dur_key), key="dur_key", step=0.1)
-
         impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
         
         st.subheader("Internal Team (Year 1)")
@@ -114,10 +131,11 @@ with tab2:
         client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
         st.info(f"Calculated Client Investment: ${client_internal_investment:,.0f}")
         wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10) / 100
-    y1_investment_total = initial_setup + client_internal_investment + recurring_fee
+
+    y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (LOCKED STRUCTURE & MATH)
+# TAB 3: ROI REPORT (LOCKED STRUCTURE & REVISED CALCULATION)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
@@ -127,38 +145,41 @@ with tab3:
     
     if target_mode:
         target_yrs = st.number_input("Target Years to Breakeven", min_value=1.1, value=3.5, step=0.1)
-        total_recover = y1_investment_total + (recurring_fee * (target_yrs - 1))
+        # Targeter logic updated for Transition Year
+        total_recover = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
         effective_yrs = target_yrs - (1 - impl_factor)
         esc_hourly_rate = hourly_rate_pp * (1 + escalation_rate)
         final_calc_pct = (total_recover / (effective_yrs if effective_yrs > 0 else 1)) / (total_annual_hours_pp * num_employees * (improvement_target/100 if improvement_target > 1 else improvement_target) * esc_hourly_rate)
         target_hrs_pw_person = (final_calc_pct * total_annual_hours_pp) / 52
         st.markdown(f'<div style="background-color:rgba(30,144,255,0.1); border-left:5px solid #1E90FF; padding:20px; border-radius:5px; margin-bottom:25px;"><span style="font-size:22px; font-weight:bold; color:#1E90FF;">Target identified: Address {target_hrs_pw_person:.2f} productive hours / week per person.</span></div>', unsafe_allow_html=True)
 
-    # --- MATH ENGINE ---
+    # --- UPDATED MATH ENGINE ---
     savings, investments = [], []
     for yr in range(1, analysis_years + 1):
         yr_hourly_rate = (burdened_cost_pp * ((1 + escalation_rate) ** (yr - 1))) / total_annual_hours_pp
         yr_saving = (total_annual_hours_pp * final_calc_pct * num_employees) * (improvement_target/100 if improvement_target > 1 else improvement_target) * yr_hourly_rate
+        
         if yr == 1:
             savings.append(yr_saving * impl_factor)
             investments.append(-y1_investment_total)
         else:
             savings.append(yr_saving)
-            investments.append(-recurring_fee)
+            investments.append(-steady_state_recurring)
     
     df = pd.DataFrame({"Period": [f"Year {i}" for i in range(1, analysis_years + 1)], "Investment": investments, "Gross Savings": savings})
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
 
-    # Metrics
-    total_tco = (recurring_fee * analysis_years) + initial_setup + client_internal_investment
+    # Metrics Summary
+    total_sub_cost = y1_recurring + (steady_state_recurring * (analysis_years - 1))
+    total_tco = total_sub_cost + initial_setup + client_internal_investment
     annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100 if improvement_target > 1 else improvement_target) * num_employees
     fte_reclaimed = math.floor((annual_hrs / total_annual_hours_pp) * 10) / 10.0
     npv_val = sum(val / (1+wacc)**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
     i1, i2, i3, i4 = st.columns(4)
-    i1.metric("Subscription Fees", f"${(recurring_fee * analysis_years):,.0f}")
+    i1.metric("Subscription (Total)" if sub_type == "New Investment" else "Subscription (Transition)", f"${total_sub_cost:,.0f}")
     i2.metric("Consulting Services", f"${initial_setup:,.0f}")
     i3.metric("Client Investment", f"${client_internal_investment:,.0f}")
     i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
@@ -205,9 +226,8 @@ with tab3:
     )
     st.markdown(summary_html, unsafe_allow_html=True)
 
-    # --- COMPREHENSIVE GLOSSARY (LOCKED) ---
+    # --- GLOSSARY (LOCKED) ---
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
-        st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money and the cost of capital.")
         st.info(f"""
         **Blue Yonder Value Realization Framework**
         In alignment with **Blue Yonder's Cognitive Supply Chain** strategy, this model captures the foundational **Productivity Dividend** of the "Pivot to Growth" roadmap. 
@@ -215,13 +235,12 @@ with tab3:
         **Customer Performance Benchmarks:**
         * **Labor Productivity:** Typical realization of 15% to 30% efficiency gains through automated task prioritization.
         * **Operational Agility:** Creation of 'Shadow Capacity'—allowing teams to absorb 10-15% volume growth without adding headcount.
-        * **Decision Velocity:** AI-assisted work directing reduces 'swivel-chair' activity, enabling planners to focus on high-impact strategic trade-offs.
         
         *Reference: www.blueyonder.com*
         """)
     
     # --- CHART WITH TOGGLE ---
-    chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Path"], horizontal=True, help="Toggle between cumulative ROI and annual cash flow.")
+    chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Flow"], horizontal=True, help="Toggle between cumulative ROI and annual cash flow.")
     
     fig = go.Figure()
     if chart_view == "Cumulative Path":
