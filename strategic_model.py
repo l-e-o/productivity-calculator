@@ -80,7 +80,7 @@ with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        solution_name = st.text_input("Solution Name", value="Blue Yonder Cognitive Solution", help="Specific module name.")
+        solution_name = st.text_input("Solution Name", value="Cognitive Merchandise Financial Planning (CMFP)", help="Specific module name.")
         
         if investment_strategy == "Pre-existing Solution Upgrade":
             curr_sub = st.number_input("Current Annual Subscription ($)", value=800000, help="Current legacy spend.")
@@ -93,7 +93,7 @@ with tab2:
         
         st.divider()
         initial_setup = st.number_input("Consulting Services Fees", value=500000, help="Implementation costs.")
-        analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 7, help="Evaluation period.")
+        analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 5, help="Evaluation period.")
         escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3, help="Projected labor inflation.")
 
     with c2:
@@ -128,7 +128,7 @@ with tab2:
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (LOCKED NARRATIVES & UPDATED LABELS)
+# TAB 3: ROI REPORT (FINAL NARRATIVE UPDATE)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
@@ -159,7 +159,6 @@ with tab3:
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
 
-    # Metrics
     total_sub_cost = y1_recurring + (steady_state_recurring * (analysis_years - 1))
     total_tco = total_sub_cost + initial_setup + client_internal_investment
     annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100 if improvement_target > 1 else improvement_target) * num_employees
@@ -167,7 +166,6 @@ with tab3:
     npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
-    # --- UPDATED LABELS ---
     if investment_strategy == "Pre-existing Solution Upgrade":
         i1, i2, i3, i4, i5 = st.columns(5)
         i1.metric("First Year Incremental Subscription", f"${y1_recurring:,.0f}")
@@ -195,7 +193,7 @@ with tab3:
     v6.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
     st.divider()
 
-    # --- BOARD-LEVEL EXECUTIVE SUMMARY (LOCKED) ---
+    # --- BOARD-LEVEL EXECUTIVE SUMMARY (LOCKED WITH FINAL NARRATIVE FIX) ---
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
     npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
     recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
@@ -212,17 +210,18 @@ with tab3:
     else:
         analysis_logic = f'<div style="color:#2E7D32; margin-bottom:20px;"><b>✅ Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
 
+    # UPDATED PROJECT OVERVIEW SECTION
     summary_html = (
         f'<div style="border:1px solid rgba(128,128,128,0.3); padding:30px; border-radius:10px; font-family:\'Segoe UI\',sans-serif; line-height:1.8;">'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Strategic Project Overview</b><br>'
-        f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive Supply Chain</b> powered by <b>{solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>autonomous "exception-only" management</b>, ensuring human capital is focused on high-impact strategic trade-offs.</div>'
+        f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive solution</b> powered by <b>Blue Yonder\'s {solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>autonomous "exception-only" management</b>, ensuring human capital is focused on high-impact strategic trade-offs.</div>'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Capacity Realization (Shadow Capacity)</b><br>'
         f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b> without escalating recruitment or payroll liabilities. This "Shadow Capacity" acts as a <b>Volume Multiplier</b> for the {industry} team, directly enabling {solution_context}</div>'
         f'<hr style="border:0; border-top:1px solid rgba(128,128,128,0.3); margin:25px 0;">{analysis_logic}</div>'
     )
     st.markdown(summary_html, unsafe_allow_html=True)
 
-    # --- GLOSSARY (LOCKED & RESTORED FULL CONTENT) ---
+    # --- GLOSSARY (LOCKED) ---
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
         st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money and the cost of capital.")
         st.info(f"""
