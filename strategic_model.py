@@ -14,7 +14,7 @@ st.markdown("Quantifying the multi-year value of operational transformation.")
 tab1, tab2, tab3 = st.tabs(["📊 Baseline & Industry", "💰 Investment & Horizon", "📈 ROI Report"])
 
 # =================================================================
-# TAB 1: OPERATIONAL STRATEGY (LOCKED STRUCTURE & HELP TOOLTIPS)
+# TAB 1: OPERATIONAL STRATEGY (RESTORED TOOLTIPS)
 # =================================================================
 with tab1:
     st.header("1. Operational Strategy")
@@ -34,7 +34,6 @@ with tab1:
             help="Contextualizes the business environment and selects relevant productivity benchmarks."
         )
         
-        # --- DYNAMIC INDUSTRY GUIDANCE ---
         if industry == "Retail":
             if investment_strategy == "New Solution":
                 st.info("**Retail (New):** Leakage: 15-25% (Manual siloes) | Target Gain: 40-60% (Full Automation)")
@@ -63,21 +62,20 @@ with tab1:
         hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
         
         st.divider()
-        input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True)
+        input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True, help="Select the metric that best captures current latent manual friction.")
         
-        # --- FIXED SYNCHRONIZED CALCULATION ---
+        weekly_productive_hours = daily_hours * 5
         if input_method == "Hours per Week":
-            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=7.5, help="Hours lost per person per week.")
-            weekly_productive_hours = daily_hours * 5
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=4.0, help="Hours lost per person per week.")
             baseline_waste_pct = baseline_waste_hrs_pw / weekly_productive_hours
         else:
-            baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, 20, help="Portion of time consumed by friction.")
+            baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, 10, help="Portion of time consumed by friction.")
             baseline_waste_pct = baseline_waste_pct_input / 100
         
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100, help="Efficiency recovered by AI.")
 
 # =================================================================
-# TAB 2: INVESTMENT & HORIZON (LOCKED STRUCTURE & HELP TOOLTIPS)
+# TAB 2: INVESTMENT & HORIZON (RESTORED TOOLTIPS)
 # =================================================================
 with tab2:
     st.header("2. Investment & Time Horizon")
@@ -115,8 +113,8 @@ with tab2:
                     st.session_state.dur_key = round(st.session_state.dur_key * 4.33, 1)
                 st.session_state.last_unit = current_unit
 
-        impl_unit = st.radio("Implementation Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration)
-        impl_duration = st.number_input(f"Duration ({impl_unit})", value=float(st.session_state.dur_key), key="dur_key", step=0.1, help="Time to go-live.")
+        impl_unit = st.radio("Implementation Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration, help="Unit for deployment timeline.")
+        impl_duration = st.number_input(f"Duration ({impl_unit})", key="dur_key", step=0.1, help="Time to go-live.")
         impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
         
         st.subheader("Internal Team (Year 1)")
@@ -131,26 +129,61 @@ with tab2:
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (FULL NARRATIVE RESTORED & MATH LOCKED)
+# TAB 3: ROI REPORT (ULTRA-PRECISION & RESTORED NARRATIVES)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
+    
+    def get_be_years(in_waste_pct):
+        s, i = [], []
+        for yr in range(1, analysis_years + 1):
+            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
+            yr_sav = (total_annual_hours_pp * in_waste_pct * num_employees) * (improvement_target/100) * yr_rate
+            if yr == 1:
+                s.append(yr_sav * impl_factor)
+                i.append(-y1_investment_total)
+            else:
+                s.append(yr_sav)
+                i.append(-steady_state_recurring)
+        cum_cf = np.cumsum(np.array(s) + np.array(i))
+        for idx in range(len(cum_cf)):
+            if cum_cf[idx] >= 0:
+                if idx == 0: return y1_investment_total / (s[0]) if s[0] > 0 else 0
+                prev_cum = cum_cf[idx-1]
+                net_now = (s[idx] + i[idx])
+                return idx + (abs(prev_cum) / net_now) if net_now > 0 else idx
+        return 0.0
+
+    current_be = get_be_years(baseline_waste_pct)
     target_mode = st.toggle("Enable Reverse Target Mode", help="Breakeven analysis.")
     final_calc_pct = baseline_waste_pct
     
     if target_mode:
-        target_yrs = st.number_input("Target Years to Breakeven", min_value=1.1, value=3.5, step=0.1)
-        total_recover = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
-        effective_yrs = target_yrs - (1 - impl_factor)
-        final_calc_pct = (total_recover / (effective_yrs if effective_yrs > 0 else 1)) / (total_annual_hours_pp * num_employees * (improvement_target/100 if improvement_target > 1 else improvement_target) * (hourly_rate_pp * (1 + escalation_rate/100)))
-        target_hrs_pw_person = (final_calc_pct * total_annual_hours_pp) / 52
+        target_yrs = st.number_input("Target Years to Breakeven", min_value=1.1, value=float(round(current_be, 2)) if current_be > 0 else 3.7, step=0.1, help="Desired years to achieve full payback.")
+        
+        cumulative_investment = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
+        weight_sum = 0
+        for yr in range(1, int(math.ceil(target_yrs)) + 1):
+            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
+            yr_weight = total_annual_hours_pp * num_employees * (improvement_target/100) * yr_rate
+            if yr == 1:
+                weight_sum += yr_weight * impl_factor
+            elif yr < target_yrs:
+                weight_sum += yr_weight
+            else:
+                fraction = target_yrs - (yr - 1)
+                weight_sum += yr_weight * fraction
+        
+        final_calc_pct = cumulative_investment / weight_sum if weight_sum > 0 else 0
+        target_hrs_pw_person = final_calc_pct * (daily_hours * 5)
+        
         st.markdown(f'<div style="background-color:rgba(30,144,255,0.1); border-left:5px solid #1E90FF; padding:20px; border-radius:5px; margin-bottom:25px;"><span style="font-size:22px; font-weight:bold; color:#1E90FF;">Target identified: Address {target_hrs_pw_person:.2f} productive hours / week per person.</span></div>', unsafe_allow_html=True)
 
-    # --- MATH ENGINE ---
+    # Final Math Processing
     savings, investments = [], []
     for yr in range(1, analysis_years + 1):
         yr_hourly_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
-        yr_saving = (total_annual_hours_pp * final_calc_pct * num_employees) * (improvement_target/100 if improvement_target > 1 else improvement_target) * yr_hourly_rate
+        yr_saving = (total_annual_hours_pp * final_calc_pct * num_employees) * (improvement_target/100) * yr_hourly_rate
         if yr == 1:
             savings.append(yr_saving * impl_factor)
             investments.append(-y1_investment_total)
@@ -162,42 +195,39 @@ with tab3:
     df["Net Cash Flow"] = df["Investment"] + df["Gross Savings"]
     df["Cumulative Cash Flow"] = df["Net Cash Flow"].cumsum()
 
-    # Calculation metrics for report display
+    final_be = get_be_years(final_calc_pct)
     total_sub_cost = y1_recurring + (steady_state_recurring * (analysis_years - 1))
     total_tco = total_sub_cost + initial_setup + client_internal_investment
-    annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100 if improvement_target > 1 else improvement_target) * num_employees
+    annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100) * num_employees
     fte_reclaimed = math.floor((annual_hrs / total_annual_hours_pp) * 10) / 10.0
     npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
     if investment_strategy == "Pre-existing Solution Upgrade":
-        i1, i2, i3, i4, i5 = st.columns(5)
-        i1.metric("First Year Incremental Subscription", f"${y1_recurring:,.0f}")
-        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
-        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
-        i4.metric("Services", f"${initial_setup:,.0f}")
-        i5.metric("TOTAL TCO", f"${total_tco:,.0f}")
-    else:
-        i1, i2, i3, i4 = st.columns(4)
-        i1.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
-        i2.metric("Total Subscription", f"${total_sub_cost:,.0f}")
-        i3.metric("Services", f"${initial_setup:,.0f}")
+        i1, i2, i3, i4, i5, i6 = st.columns(6)
+        i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
+        i2.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
+        i3.metric("Total Sub", f"${total_sub_cost:,.0f}")
         i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
+        i5.metric("Break-Even", f"{final_be:.1f} Yrs" if final_be > 0 else "N/A")
+        i6.metric("NPV", f"${npv_val:,.0f}")
+    else:
+        i1, i2, i3, i4, i5 = st.columns(5)
+        i1.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
+        i2.metric("Total Sub", f"${total_sub_cost:,.0f}")
+        i3.metric("TOTAL TCO", f"${total_tco:,.0f}")
+        i4.metric("Break-Even", f"{final_be:.1f} Yrs" if final_be > 0 else "N/A")
+        i5.metric("NPV", f"${npv_val:,.0f}")
     st.divider()
 
     st.subheader("Efficiency & Value Realization")
-    v1, v2, v3 = st.columns(3)
+    v1, v2, v3, v4 = st.columns(4)
     v1.metric("Pro-Rated Saving (Yr 1)", f"${savings[0]:,.0f}")
     v2.metric("Steady State Saving (Yr 2+)", f"${savings[1] if analysis_years > 1 else 0:,.0f}")
     v3.metric("FTE Reclaimed", f"{fte_reclaimed} FTE")
-
-    v4, v5, v6 = st.columns(3)
-    v4.metric("Annual Hours Reclaimed", f"{annual_hrs:,.0f} hrs")
-    v5.metric("Monthly Hours Reclaimed", f"{(annual_hrs/12):,.0f} hrs")
-    v6.metric(f"{analysis_years}-Year NPV", f"${npv_val:,.0f}")
+    v4.metric("Hours Reclaimed (Ann / Mon)", f"{annual_hrs:,.0f} / {(annual_hrs/12):,.0f}")
     st.divider()
 
-    # --- BOARD-LEVEL EXECUTIVE SUMMARY (RESTORED FULL CONTENT) ---
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
     npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
     recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
@@ -210,9 +240,9 @@ with tab3:
         solution_context = "improved operational resilience and decision velocity."
 
     if npv_val < 0:
-        analysis_logic = f'<div style="color:#D32F2F; margin-bottom:20px;"><b>⚠️ Strategic Context: {npv_status} NPV</b><br>Project costs currently exceed the discounted value of labor savings. Tactical adjustments required to meet the {wacc:.1f}% hurdle rate based on productivity alone.</div>'
+        financial_viability = f'<div style="color:#D32F2F; margin-bottom:20px;"><b>⚠️ Strategic Context: {npv_status} NPV</b><br>Project costs currently exceed the discounted value of labor savings. Tactical adjustments required to meet the {wacc:.1f}% hurdle rate based on productivity alone. This indicates that the current scope of automation must be either expanded to recover more latent waste or the subscription costs must be aligned with the anticipated yield of the transformation.</div>'
     else:
-        analysis_logic = f'<div style="color:#2E7D32; margin-bottom:20px;"><b>✅ Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
+        financial_viability = f'<div style="color:#2E7D32; margin-bottom:20px;"><b>✅ Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
 
     summary_html = (
         f'<div style="border:1px solid rgba(128,128,128,0.3); padding:30px; border-radius:10px; font-family:\'Segoe UI\',sans-serif; line-height:1.8;">'
@@ -220,23 +250,18 @@ with tab3:
         f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive solution</b> powered by <b>Blue Yonder\'s {solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>autonomous "exception-only" management</b>, ensuring human capital is focused on high-impact strategic trade-offs.</div>'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Capacity Realization (Shadow Capacity)</b><br>'
         f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b> without escalating recruitment or payroll liabilities. This "Shadow Capacity" acts as a <b>Volume Multiplier</b> for the {industry} team, directly enabling {solution_context}</div>'
-        f'<hr style="border:0; border-top:1px solid rgba(128,128,128,0.3); margin:25px 0;">{analysis_logic}</div>'
+        f'<hr style="border:0; border-top:1px solid rgba(128,128,128,0.3); margin:25px 0;">{financial_viability}</div>'
     )
     st.markdown(summary_html, unsafe_allow_html=True)
 
-    # --- GLOSSARY (LOCKED) ---
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
-        st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money and the cost of capital.")
+        st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money.")
         st.info(f"""
         **Blue Yonder Value Realization Framework**
-        In alignment with **Blue Yonder's Cognitive Supply Chain** strategy, this model captures the foundational **Productivity Dividend** of the "Pivot to Growth" roadmap. 
-        
-        **Customer Performance Benchmarks:**
+        In alignment with **Blue Yonder's Cognitive Supply Chain** strategy, this model captures the foundational **Productivity Dividend**.
         * **Labor Productivity:** Typical realization of 15% to 30% efficiency gains through automated task prioritization.
-        * **Operational Agility:** Creation of 'Shadow Capacity'—allowing teams to absorb 10-15% volume growth without adding headcount.
+        * **Operational Agility:** Creation of 'Shadow Capacity'—allowing teams to absorb 10-15% volume growth.
         * **Decision Velocity:** AI-assisted work directing reduces 'swivel-chair' activity, enabling planners to focus on high-impact strategic trade-offs.
-        
-        *Reference: www.blueyonder.com*
         """)
     
     chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Flow"], horizontal=True, help="Toggle visualizations.")
@@ -247,5 +272,4 @@ with tab3:
         fig.add_trace(go.Bar(x=df["Period"], y=df["Net Cash Flow"], marker_color='#1f77b4'))
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.3)
     st.plotly_chart(fig, use_container_width=True)
-
     st.dataframe(df.style.format({"Investment": "${:,.0f}", "Gross Savings": "${:,.0f}", "Net Cash Flow": "${:,.0f}", "Cumulative Cash Flow": "${:,.0f}"}), hide_index=True, use_container_width=True)
