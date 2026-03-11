@@ -14,7 +14,7 @@ st.markdown("Quantifying the multi-year value of operational transformation.")
 tab1, tab2, tab3 = st.tabs(["📊 Baseline & Industry", "💰 Investment & Horizon", "📈 ROI Report"])
 
 # =================================================================
-# TAB 1: OPERATIONAL STRATEGY (RESTORED TOOLTIPS)
+# TAB 1: OPERATIONAL STRATEGY
 # =================================================================
 with tab1:
     st.header("1. Operational Strategy")
@@ -75,7 +75,7 @@ with tab1:
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100, help="Efficiency recovered by AI.")
 
 # =================================================================
-# TAB 2: INVESTMENT & HORIZON (RESTORED TOOLTIPS)
+# TAB 2: INVESTMENT & HORIZON
 # =================================================================
 with tab2:
     st.header("2. Investment & Time Horizon")
@@ -129,7 +129,7 @@ with tab2:
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (ULTRA-PRECISION & RESTORED NARRATIVES)
+# TAB 3: ROI REPORT (ALL METRICS & NARRATIVES REINSTATED)
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
@@ -161,6 +161,7 @@ with tab3:
     if target_mode:
         target_yrs = st.number_input("Target Years to Breakeven", min_value=1.1, value=float(round(current_be, 2)) if current_be > 0 else 3.7, step=0.1, help="Desired years to achieve full payback.")
         
+        # Iterative precision solve
         cumulative_investment = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
         weight_sum = 0
         for yr in range(1, int(math.ceil(target_yrs)) + 1):
@@ -179,7 +180,6 @@ with tab3:
         
         st.markdown(f'<div style="background-color:rgba(30,144,255,0.1); border-left:5px solid #1E90FF; padding:20px; border-radius:5px; margin-bottom:25px;"><span style="font-size:22px; font-weight:bold; color:#1E90FF;">Target identified: Address {target_hrs_pw_person:.2f} productive hours / week per person.</span></div>', unsafe_allow_html=True)
 
-    # Final Math Processing
     savings, investments = [], []
     for yr in range(1, analysis_years + 1):
         yr_hourly_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
@@ -203,21 +203,24 @@ with tab3:
     npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
+    # --- REINSTATED SERVICES METRIC ---
     if investment_strategy == "Pre-existing Solution Upgrade":
-        i1, i2, i3, i4, i5, i6 = st.columns(6)
+        i1, i2, i3, i4, i5, i6, i7 = st.columns(7)
         i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
         i2.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
         i3.metric("Total Sub", f"${total_sub_cost:,.0f}")
-        i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i5.metric("Break-Even", f"{final_be:.1f} Yrs" if final_be > 0 else "N/A")
-        i6.metric("NPV", f"${npv_val:,.0f}")
+        i4.metric("Services", f"${initial_setup:,.0f}") # Reinstated
+        i5.metric("TOTAL TCO", f"${total_tco:,.0f}")
+        i6.metric("Break-Even", f"{final_be:.1f} Yrs")
+        i7.metric("NPV", f"${npv_val:,.0f}")
     else:
-        i1, i2, i3, i4, i5 = st.columns(5)
+        i1, i2, i3, i4, i5, i6 = st.columns(6)
         i1.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
         i2.metric("Total Sub", f"${total_sub_cost:,.0f}")
-        i3.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i4.metric("Break-Even", f"{final_be:.1f} Yrs" if final_be > 0 else "N/A")
-        i5.metric("NPV", f"${npv_val:,.0f}")
+        i3.metric("Services", f"${initial_setup:,.0f}") # Reinstated
+        i4.metric("TOTAL TCO", f"${total_tco:,.0f}")
+        i5.metric("Break-Even", f"{final_be:.1f} Yrs")
+        i6.metric("NPV", f"${npv_val:,.0f}")
     st.divider()
 
     st.subheader("Efficiency & Value Realization")
@@ -239,10 +242,7 @@ with tab3:
     else:
         solution_context = "improved operational resilience and decision velocity."
 
-    if npv_val < 0:
-        financial_viability = f'<div style="color:#D32F2F; margin-bottom:20px;"><b>⚠️ Strategic Context: {npv_status} NPV</b><br>Project costs currently exceed the discounted value of labor savings. Tactical adjustments required to meet the {wacc:.1f}% hurdle rate based on productivity alone. This indicates that the current scope of automation must be either expanded to recover more latent waste or the subscription costs must be aligned with the anticipated yield of the transformation.</div>'
-    else:
-        financial_viability = f'<div style="color:#2E7D32; margin-bottom:20px;"><b>✅ Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
+    financial_viability = f'<div style="color:{"#2E7D32" if npv_val > 0 else "#D32F2F"}; margin-bottom:20px;"><b>{"✅" if npv_val > 0 else "⚠️"} Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project is <b>{recommendation}</b>. This positive Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost. This indicates that the current scope of automation must be either expanded to recover more latent waste or the subscription costs must be aligned with the anticipated yield of the transformation.</div>'
 
     summary_html = (
         f'<div style="border:1px solid rgba(128,128,128,0.3); padding:30px; border-radius:10px; font-family:\'Segoe UI\',sans-serif; line-height:1.8;">'
