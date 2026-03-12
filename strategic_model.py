@@ -3,12 +3,21 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import math
+import re
 
 # --- App Configuration ---
 st.set_page_config(page_title="Strategic Business Case", layout="wide")
 
 st.title("🏛️ Strategic Business Case & ROI Realization Model")
 st.markdown("Quantifying the multi-year value of operational transformation.")
+
+# Helper function to handle comma-formatted currency inputs
+def currency_input(label, value, help_text):
+    formatted_init = f"{int(value):,}"
+    text_val = st.text_input(label, value=formatted_init, help=help_text)
+    # Remove commas and non-numeric chars to convert back to float
+    clean_val = re.sub(r'[^\d.]', '', text_val)
+    return float(clean_val) if clean_val else 0.0
 
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["📊 Baseline & Industry", "💰 Investment & Horizon", "📈 ROI Report"])
@@ -30,7 +39,7 @@ with tab1:
     with col1:
         industry = st.selectbox(
             "Industry Vertical", 
-            ["Retail", "Logistics Service Provider (LSP)", "Manufacturing"], 
+            ["Retail", "Logistics Service Providers (LSP)", "Manufacturing"], 
             help="Contextualizes the business environment and selects relevant productivity benchmarks."
         )
         
@@ -39,30 +48,33 @@ with tab1:
                 st.info("**Retail (New):** Leakage: 15-25% (Manual siloes) | Target Gain: 40-60% (Full Automation)")
             else:
                 st.info("**Retail (Upgrade):** Leakage: 5-12% (Residual friction) | Target Gain: 10-20% (AI Uplift)")
-        elif industry == "Logistics Service Provider (LSP)":
+        elif industry == "Logistics Service Providers (LSP)":
             if investment_strategy == "New Solution":
                 st.info("**LSP (New):** Leakage: 20-30% (Swivel-chair activity) | Target Gain: 30-50% (Optimization)")
             else:
                 st.info("**LSP (Upgrade):** Leakage: 8-15% (Manual exceptions) | Target Gain: 10-15% (Mgmt by Exception)")
         else: # Manufacturing
             if investment_strategy == "New Solution":
-                st.info("**Mfg (New):** Leakage: 20-35% (Siloed data) | Target Gain: 40-60% (Sync Signaling)")
+                st.info("**Manufacturing (New):** Leakage: 20-35% (Siloed data) | Target Gain: 40-60% (Sync Signaling)")
             else:
-                st.info("**Mfg (Upgrade):** Leakage: 7-12% (Scenario friction) | Target Gain: 15-25% (Cognitive Uplift)")
+                st.info("**Manufacturing (Upgrade):** Leakage: 7-12% (Scenario friction) | Target Gain: 15-25% (Cognitive Uplift)")
 
-        num_employees = st.number_input("Total Headcount in Scope", min_value=1, value=105, help="Staff interacting with the solution.")
-        annual_salary = st.number_input("Avg. Annual Salary ($)", value=100000, help="Average base salary.")
-        fringe_rate = st.slider("Burden Rate (%)", 0, 50, 20, help="Local statutory costs (Super, Tax, etc.).")
+        num_employees = st.number_input("Total Headcount in Scope", min_value=1, value=105, help="Number of users of the solution.")
+        
+        # Formatted Salary Input
+        annual_salary = currency_input("Avg. Annual Salary ($)", 100000, "Average base salary.")
+        
+        fringe_rate = st.slider("Employee Burden Rate (%)", 0, 50, 20, help="Local statutory costs (Super, Tax, etc.).")
         burdened_cost_pp = annual_salary * (1 + fringe_rate/100)
     
     with col2:
-        work_days = st.number_input("Working Days / Year", value=220, help="Standardized annual working days.")
+        work_days = st.number_input("Productive Working Days / Year", value=220, help="Standardized annual working days.")
         daily_hours = st.number_input("Standard Productive Hours / Day", value=7.50, help="Actual time spent on core tasks.")
         total_annual_hours_pp = work_days * daily_hours
         hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
         
         st.divider()
-        input_method = st.radio("Define Inefficiency Basis:", ["Hours per Week", "Percentage of Total Time"], horizontal=True, help="Select the metric that best captures current latent manual friction.")
+        input_method = st.radio("Inefficiency Target:", ["Hours per Week", "Percentage of Total Time"], horizontal=True, help="Enter the hours per week per user of inefficiency to be reduced or eliminated.")
         
         weekly_productive_hours = daily_hours * 5
         if input_method == "Hours per Week":
@@ -81,21 +93,21 @@ with tab2:
     st.header("2. Investment & Time Horizon")
     c1, c2 = st.columns(2)
     with c1:
-        solution_name = st.text_input("Solution Name", value="Cognitive Merchandise Financial Planning (CMFP)", help="Specific module name.")
+        solution_name = st.text_input("Solution Name", value="Cognitive Merchandise Financial Planning (CMFP)", help="Specific solution or module name.")
         
         if investment_strategy == "Pre-existing Solution Upgrade":
-            curr_sub = st.number_input("Current Annual Subscription ($)", value=800000, help="Current legacy spend.")
-            future_sub = st.number_input("Future Annual Subscription ($)", value=1200000, help="Total new Cognitive spend.")
+            curr_sub = currency_input("Current Annual Subscription ($)", 800000, "Current legacy spend.")
+            future_sub = currency_input("Future Annual Subscription ($)", 1200000, "Total new Cognitive spend.")
             y1_recurring = future_sub - curr_sub
             steady_state_recurring = future_sub
         else:
-            y1_recurring = st.number_input("Annual SaaS Fees ($)", value=1200000, help="Recurring subscription cost.")
+            y1_recurring = currency_input("Annual SaaS Fees ($)", 1200000, "Recurring subscription cost.")
             steady_state_recurring = y1_recurring
         
         st.divider()
-        initial_setup = st.number_input("Consulting Services Fees", value=500000, help="One-time professional services costs for implementation.")
+        initial_setup = currency_input("Consulting Services Fees", 500000, "One-time professional services costs for implementation.")
         analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 5, help="Evaluation period.")
-        escalation_rate = st.slider("Annual Labor Escalation (%)", 0, 10, 3, help="Projected labor inflation.")
+        escalation_rate = st.slider("Annual Employee Salary Increases (%)", 0, 10, 3, help="Projected labor cost inflation.")
 
     with c2:
         st.divider()
@@ -113,23 +125,23 @@ with tab2:
                     st.session_state.dur_key = round(st.session_state.dur_key * 4.33, 1)
                 st.session_state.last_unit = current_unit
 
-        impl_unit = st.radio("Implementation Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration, help="Unit for deployment timeline.")
+        impl_unit = st.radio("Implementation Duration Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration, help="Unit of implementation timeline.")
         impl_duration = st.number_input(f"Duration ({impl_unit})", key="dur_key", step=0.1, help="Time to go-live.")
         impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
         
-        st.subheader("Internal Team (Year 1)")
-        key_users = st.number_input("Number of Key Users", value=5, help="Internal implementation SMEs.")
+        st.subheader("Client Internal Team (Year 1)")
+        key_users = st.number_input("Number of Key Users Dedicated to the Project", value=5, help="Client implementation SMEs.")
         impl_intensity = st.select_slider("Intensity", options=["Low", "Medium", "High"], value="Medium", help="Hours required from SMEs.")
         intensity_map = {"Low": 250, "Medium": 500, "High": 750}
         client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
-        st.info(f"Calculated Client Investment (Shadow Cost): ${client_internal_investment:,.0f}")
+        st.info(f"Estimated Client Investment (Shadow Cost): ${client_internal_investment:,.0f}")
         
         wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10, help="The hurdle rate used to discount future cash flows.")
 
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT (ALL METRICS & NARRATIVES REINSTATED)
+# TAB 3: ROI REPORT
 # =================================================================
 with tab3:
     st.header("📈 ROI Report & Targeter")
@@ -155,28 +167,22 @@ with tab3:
         return 0.0
 
     current_be = get_be_years(baseline_waste_pct)
-    target_mode = st.toggle("Enable Reverse Target Mode", help="Breakeven analysis.")
+    target_mode = st.toggle("Enable Breakeven Period Target", help="Breakeven analysis.")
     final_calc_pct = baseline_waste_pct
     
     if target_mode:
         target_yrs = st.number_input("Target Years to Breakeven", min_value=1.1, value=float(round(current_be, 2)) if current_be > 0 else 3.7, step=0.1, help="Desired years to achieve full payback.")
-        
         cumulative_investment = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
         weight_sum = 0
         for yr in range(1, int(math.ceil(target_yrs)) + 1):
             yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
             yr_weight = total_annual_hours_pp * num_employees * (improvement_target/100) * yr_rate
-            if yr == 1:
-                weight_sum += yr_weight * impl_factor
-            elif yr < target_yrs:
-                weight_sum += yr_weight
-            else:
-                fraction = target_yrs - (yr - 1)
-                weight_sum += yr_weight * fraction
+            if yr == 1: weight_sum += yr_weight * impl_factor
+            elif yr < target_yrs: weight_sum += yr_weight
+            else: weight_sum += yr_weight * (target_yrs - (yr - 1))
         
         final_calc_pct = cumulative_investment / weight_sum if weight_sum > 0 else 0
         target_hrs_pw_person = final_calc_pct * (daily_hours * 5)
-        
         st.markdown(f'<div style="background-color:rgba(30,144,255,0.1); border-left:5px solid #1E90FF; padding:20px; border-radius:5px; margin-bottom:25px;"><span style="font-size:22px; font-weight:bold; color:#1E90FF;">Target identified: Address {target_hrs_pw_person:.2f} productive hours / week per person.</span></div>', unsafe_allow_html=True)
 
     savings, investments = [], []
@@ -202,14 +208,13 @@ with tab3:
     npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
 
     st.subheader("Total Investment Summary (TCO)")
-    # --- REINSTATED ALL COMPONENTS: UPLIFT, SUB, SERVICES, SHADOW COST, TCO, BE, NPV ---
     if investment_strategy == "Pre-existing Solution Upgrade":
         i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
         i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
         i2.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
         i3.metric("Total Sub", f"${total_sub_cost:,.0f}")
         i4.metric("Services", f"${initial_setup:,.0f}")
-        i5.metric("Shadow Cost", f"${client_internal_investment:,.0f}") # Reinstated
+        i5.metric("Shadow Cost", f"${client_internal_investment:,.0f}")
         i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
         i7.metric("Break-Even", f"{final_be:.1f} Yrs")
         i8.metric("NPV", f"${npv_val:,.0f}")
@@ -218,7 +223,7 @@ with tab3:
         i1.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
         i2.metric("Total Sub", f"${total_sub_cost:,.0f}")
         i3.metric("Services", f"${initial_setup:,.0f}")
-        i4.metric("Shadow Cost", f"${client_internal_investment:,.0f}") # Reinstated
+        i4.metric("Shadow Cost", f"${client_internal_investment:,.0f}")
         i5.metric("TOTAL TCO", f"${total_tco:,.0f}")
         i6.metric("Break-Even", f"{final_be:.1f} Yrs")
         i7.metric("NPV", f"${npv_val:,.0f}")
@@ -236,7 +241,7 @@ with tab3:
     npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
     recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
 
-    if industry == "Logistics Service Provider (LSP)":
+    if industry == "Logistics Service Providers (LSP)":
         solution_context = "increased throughput capacity and asset utilization in lean-margin environments."
     elif industry == "Manufacturing":
         solution_context = "enhanced production synchronization and reduced lead-time volatility."
@@ -257,7 +262,7 @@ with tab3:
 
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
         st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money.")
-        st.info(f"""
+        st.info("""
         **Blue Yonder Value Realization Framework**
         * **Labor Productivity:** Typical realization of 15% to 30% efficiency gains through automated task prioritization.
         * **Operational Agility:** Creation of 'Shadow Capacity'—allowing teams to absorb 10-15% volume growth.
