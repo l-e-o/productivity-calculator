@@ -6,10 +6,10 @@ import math
 import re
 
 # --- App Configuration ---
-st.set_page_config(page_title="Strategic Business Case", layout="wide")
+st.set_page_config(page_title="Productivity Business Case Calculator", layout="wide")
 
-st.title("🏛️ Strategic Business Case & ROI Realization Model")
-st.markdown("Quantifying the multi-year value of operational transformation.")
+st.title("🏛️ Productivity Value Realization")
+st.markdown("Quantifying the multi-year value of improving operational efficiency.")
 
 # --- Helper function for live comma formatting ---
 def currency_input(label, default_value, help_text, key):
@@ -51,12 +51,14 @@ with tab1:
             help="Contextualizes the business environment and selects relevant productivity benchmarks."
         )
         
-        if industry == "Retail":
-            st.info("**Retail:** Leakage: 15-25% | Target Gain: 40-60%")
-        elif industry == "Logistics Service Providers (LSP)":
-            st.info("**LSP:** Leakage: 20-30% | Target Gain: 30-50%")
-        else:
-            st.info("**Manufacturing:** Leakage: 20-35% | Target Gain: 40-60%")
+        # INDUSTRY BENCHMARK LOGIC
+        benchmarks = {
+            "Retail": {"leakage": 20.0, "hours": 8.0, "context": "Promo friction & stock-outs"},
+            "Logistics Service Providers (LSP)": {"leakage": 25.0, "hours": 10.0, "context": "Manual dispatching & carrier churn"},
+            "Manufacturing": {"leakage": 18.0, "hours": 7.2, "context": "Schedule jitter & material lag"}
+        }
+        
+        st.info(f"**Industry Context:** {benchmarks[industry]['context']}. Typical productive leakage is {benchmarks[industry]['leakage']}% ({benchmarks[industry]['hours']} hrs/wk).")
 
         num_employees = st.number_input("Total Headcount in Scope", min_value=1, value=1, help="Number of users of the solution.")
         annual_salary = currency_input("Avg. Annual Salary ($)", 0, "Average base salary.", "salary_state")
@@ -72,12 +74,18 @@ with tab1:
         st.divider()
         input_method = st.radio("Inefficiency Target:", ["Hours per Week", "Percentage of Week"], horizontal=True, help="Enter the hours per week per user of inefficiency to be reduced or eliminated.")
         
+        if st.button(f"✨ Apply {industry} Benchmark"):
+            st.session_state['manual_target_hrs'] = benchmarks[industry]['hours']
+            st.session_state['manual_target_pct'] = benchmarks[industry]['leakage']
+        
         weekly_productive_hours = daily_hours * 5
         if input_method == "Hours per Week":
-            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=0.0)
+            default_hrs = st.session_state.get('manual_target_hrs', 0.0)
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=default_hrs)
             baseline_waste_pct = baseline_waste_hrs_pw / weekly_productive_hours
         else:
-            baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, 10)
+            default_pct = st.session_state.get('manual_target_pct', 10)
+            baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, int(default_pct))
             baseline_waste_pct = baseline_waste_pct_input / 100
         
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100)
@@ -101,7 +109,7 @@ with tab2:
             steady_state_recurring = y1_recurring
         
         st.divider()
-        initial_setup = currency_input("Consulting Services Fees", 0, "Professional services costs.", "services_state")
+        initial_setup = currency_input("Implementation Services Fees", 0, "Professional services costs.", "services_state")
         analysis_years = st.slider("ROI Horizon (Years)", 2, 10, 5)
         escalation_rate = st.slider("Annual Employee Salary Increases (%)", 0, 10, 3)
 
@@ -132,7 +140,12 @@ with tab2:
         client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
         st.info(f"Estimated Client Investment (Shadow Cost): ${client_internal_investment:,.0f}")
         
-        wacc = st.slider("Discount Rate (WACC %)", 5, 15, 10)
+        # ADDED HELP TOOLTIP FOR WACC
+        wacc = st.slider(
+            "Discount Rate / Weighted Average Cost of Capital (WACC) %", 
+            5, 15, 10, 
+            help="Weighted Average Cost of Capital: The hurdle rate used to discount future cash flows. Represents the minimum return an organization expects to offset the cost of funding and risk."
+        )
 
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
@@ -207,7 +220,7 @@ with tab3:
     if investment_strategy == "Pre-existing Solution Upgrade":
         i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
         i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
-        i2.metric("Annual Subsciption", f"${steady_state_recurring:,.0f}")
+        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
         i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
         i4.metric("Implementation Services", f"${initial_setup:,.0f}")
         i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
@@ -216,10 +229,10 @@ with tab3:
         i8.metric("Net Present Value (NPV)", f"${npv_val:,.0f}")
     else:
         i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
-        i1.metric("Year 1 Subscription", f"${y1_recurring:,.0f}") # Reinstated for New Solution
+        i1.metric("Year 1 Subscription", f"${y1_recurring:,.0f}")
         i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
         i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
-        i4.metric("implementation Services", f"${initial_setup:,.0f}")
+        i4.metric("Implementation Services", f"${initial_setup:,.0f}")
         i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
         i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
         i7.metric("Break Even", f"{final_be:.1f} Yrs")
@@ -243,6 +256,12 @@ with tab3:
     else:
         viability_text = f"This {npv_status} Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost."
 
+    industry_impact = {
+        "Retail": "improved operational resilience and decision velocity in omni-channel environments.",
+        "Logistics Service Providers (LSP)": "increased throughput capacity and asset utilization in lean-margin environments.",
+        "Manufacturing": "enhanced production synchronization and reduced lead-time volatility."
+    }
+
     financial_viability = f'<div style="color:{"#2E7D32" if npv_val > 0 else "#D32F2F"}; margin-bottom:20px;"><b>{"✅" if npv_val > 0 else "⚠️"} Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project <b>{recommendation}</b>. {viability_text} As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
 
     summary_html = (
@@ -250,7 +269,7 @@ with tab3:
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Strategic Project Overview</b><br>'
         f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive solution</b> powered by <b>Blue Yonder\'s {solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>autonomous "exception-only" management</b>, ensuring human capital is focused on high-impact strategic trade-offs.</div>'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Capacity Realization (Shadow Capacity)</b><br>'
-        f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b> without escalating recruitment or payroll liabilities. This "Shadow Capacity" acts as a <b>Volume Multiplier</b>, directly enabling decision velocity.</div>'
+        f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b> without escalating recruitment or payroll liabilities. This "Shadow Capacity" acts as a <b>Volume Multiplier</b>, directly enabling {industry_impact[industry]}</div>'
         f'<hr style="border:0; border-top:1px solid rgba(128,128,128,0.3); margin:25px 0;">{financial_viability}</div>'
     )
     st.markdown(summary_html, unsafe_allow_html=True)
