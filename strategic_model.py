@@ -65,16 +65,16 @@ with tab1:
     
     with col2:
         work_days = st.number_input("Productive Working Days / Year", value=220, help="Standardized annual working days.")
-        daily_hours = st.number_input("Standard Productive Hours / Day", value=8.00, help="Actual time spent on core tasks.")
+        daily_hours = st.number_input("Productive Hours / Day", value=8.00, help="Actual time spent on core tasks.")
         total_annual_hours_pp = work_days * daily_hours
         hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
         
         st.divider()
-        input_method = st.radio("Inefficiency Target:", ["Hours per Week", "Percentage of Total Time"], horizontal=True, help="Enter the hours per week per user of inefficiency to be reduced or eliminated.")
+        input_method = st.radio("Inefficiency Target:", ["Hours per Week", "Percentage of Week"], horizontal=True, help="Enter the hours per week per user of inefficiency to be reduced or eliminated.")
         
         weekly_productive_hours = daily_hours * 5
         if input_method == "Hours per Week":
-            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=4.0)
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=0.0)
             baseline_waste_pct = baseline_waste_hrs_pw / weekly_productive_hours
         else:
             baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, 10)
@@ -97,7 +97,7 @@ with tab2:
             y1_recurring = future_sub - curr_sub
             steady_state_recurring = future_sub
         else:
-            y1_recurring = currency_input("Annual SaaS Fees ($)", 0, "Recurring subscription cost.", "saas_state")
+            y1_recurring = currency_input("Annual Subscription ($)", 0, "Recurring subscription cost.", "saas_state")
             steady_state_recurring = y1_recurring
         
         st.divider()
@@ -125,7 +125,7 @@ with tab2:
         impl_duration = st.number_input(f"Duration ({impl_unit})", key="dur_key", step=0.1)
         impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
         
-        st.subheader("Client Internal Team (Year 1)")
+        st.subheader("Client Internal Team")
         key_users = st.number_input("Number of Key Users Dedicated to the Project", value=5)
         impl_intensity = st.select_slider("Intensity", options=["Low", "Medium", "High"], value="Medium")
         intensity_map = {"Low": 250, "Medium": 500, "High": 750}
@@ -207,31 +207,31 @@ with tab3:
     if investment_strategy == "Pre-existing Solution Upgrade":
         i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
         i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
-        i2.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
-        i3.metric("Total Sub", f"${total_sub_cost:,.0f}")
-        i4.metric("Services", f"${initial_setup:,.0f}")
-        i5.metric("Shadow Cost", f"${client_internal_investment:,.0f}")
+        i2.metric("Annual Subsciption", f"${steady_state_recurring:,.0f}")
+        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
+        i4.metric("Implementation Services", f"${initial_setup:,.0f}")
+        i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
         i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i7.metric("Break-Even", f"{final_be:.1f} Yrs")
-        i8.metric("NPV", f"${npv_val:,.0f}")
+        i7.metric("Break Even", f"{final_be:.1f} Yrs")
+        i8.metric("Net Present Value (NPV)", f"${npv_val:,.0f}")
     else:
         i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
-        i1.metric("Year 1 Sub", f"${y1_recurring:,.0f}") # Reinstated for New Solution
-        i2.metric("Annual Sub", f"${steady_state_recurring:,.0f}")
-        i3.metric("Total Sub", f"${total_sub_cost:,.0f}")
-        i4.metric("Services", f"${initial_setup:,.0f}")
-        i5.metric("Shadow Cost", f"${client_internal_investment:,.0f}")
+        i1.metric("Year 1 Subscription", f"${y1_recurring:,.0f}") # Reinstated for New Solution
+        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
+        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
+        i4.metric("implementation Services", f"${initial_setup:,.0f}")
+        i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
         i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i7.metric("Break-Even", f"{final_be:.1f} Yrs")
-        i8.metric("NPV", f"${npv_val:,.0f}")
+        i7.metric("Break Even", f"{final_be:.1f} Yrs")
+        i8.metric("Net Present Value (NPV)", f"${npv_val:,.0f}")
     st.divider()
 
     st.subheader("Efficiency & Value Realization")
     v1, v2, v3, v4 = st.columns(4)
-    v1.metric("Pro-Rated Saving (Yr 1)", f"${savings[0]:,.0f}")
-    v2.metric("Steady State Saving (Yr 2+)", f"${savings[1] if analysis_years > 1 else 0:,.0f}")
-    v3.metric("FTE Reclaimed", f"{fte_reclaimed} FTE")
-    v4.metric("Hours Reclaimed (Ann / Mon)", f"{annual_hrs:,.0f} / {(annual_hrs/12):,.0f}")
+    v1.metric("Prorated Savings (Yr 1)", f"${savings[0]:,.0f}")
+    v2.metric("Steady State Savings (Yr 2+)", f"${savings[1] if analysis_years > 1 else 0:,.0f}")
+    v3.metric("FTE Equivalence", f"{fte_reclaimed} FTE")
+    v4.metric("Hours Reclaimed (Annual / Monthly)", f"{annual_hrs:,.0f} / {(annual_hrs/12):,.0f}")
     st.divider()
 
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
@@ -264,9 +264,9 @@ with tab3:
         * **Decision Velocity:** AI-assisted work directing reduces 'swivel-chair' activity, enabling planners to focus on high-impact strategic trade-offs.
         """)
     
-    chart_view = st.radio("Chart View:", ["Cumulative Path", "Annual Flow"], horizontal=True)
+    chart_view = st.radio("Chart View:", ["Cumulative ROI", "Annual Net ROI"], horizontal=True)
     fig = go.Figure()
-    if chart_view == "Cumulative Path":
+    if chart_view == "Cumulative ROI":
         fig.add_trace(go.Scatter(x=df["Period"], y=df["Cumulative Cash Flow"], mode='lines+markers', line=dict(color='#1f77b4', width=4), fill='tozeroy'))
     else:
         fig.add_trace(go.Bar(x=df["Period"], y=df["Net Cash Flow"], marker_color='#1f77b4'))
