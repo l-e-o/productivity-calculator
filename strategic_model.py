@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import numpy as np
 import math
 import re
 
-# --- App Configuration ---
+# --- App Configuration (Baseline v4 Locked) ---
 st.set_page_config(page_title="Productivity Business Case Calculator", layout="wide")
 
 st.title("🏛️ Productivity Value Realization")
@@ -51,7 +52,6 @@ with tab1:
             help="Contextualizes the business environment and selects relevant productivity benchmarks."
         )
         
-        # INDUSTRY BENCHMARK LOGIC
         benchmarks = {
             "Retail": {"leakage": 20.0, "hours": 8.0, "context": "Promo friction & stock-outs"},
             "Logistics Service Providers (LSP)": {"leakage": 25.0, "hours": 10.0, "context": "Manual dispatching & carrier churn"},
@@ -69,7 +69,7 @@ with tab1:
         work_days = st.number_input("Productive Working Days / Year", value=220, help="Standardized annual working days.")
         daily_hours = st.number_input("Productive Hours / Day", value=8.00, help="Actual time spent on core tasks.")
         total_annual_hours_pp = work_days * daily_hours
-        hourly_rate_pp = burdened_cost_pp / total_annual_hours_pp
+        hourly_rate_pp = burdened_cost_pp / max(total_annual_hours_pp, 1)
         
         st.divider()
         input_method = st.radio("Inefficiency Target:", ["Hours per Week", "Percentage of Week"], horizontal=True, help="Enter the hours per week per user of inefficiency to be reduced or eliminated.")
@@ -81,17 +81,17 @@ with tab1:
         weekly_productive_hours = daily_hours * 5
         if input_method == "Hours per Week":
             default_hrs = st.session_state.get('manual_target_hrs', 0.0)
-            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=default_hrs)
-            baseline_waste_pct = baseline_waste_hrs_pw / weekly_productive_hours
+            baseline_waste_hrs_pw = st.number_input("Productive Inefficiency (Hrs/Wk/Person)", value=default_hrs, min_value=0.0, max_value=float(weekly_productive_hours))
+            baseline_waste_pct = baseline_waste_hrs_pw / max(weekly_productive_hours, 1)
         else:
-            default_pct = st.session_state.get('manual_target_pct', 10)
+            default_pct = st.session_state.get('manual_target_pct', 10.0)
             baseline_waste_pct_input = st.slider("Inefficiency Percentage (%)", 0, 100, int(default_pct))
             baseline_waste_pct = baseline_waste_pct_input / 100
         
         improvement_target = st.slider("Target Efficiency Gain (%)", 1, 100, 100)
 
 # =================================================================
-# TAB 2: INVESTMENT & HORIZON
+# TAB 2: INVESTMENT & HORIZON (Baseline v4 Locked)
 # =================================================================
 with tab2:
     st.header("2. Investment & Time Horizon")
@@ -130,8 +130,9 @@ with tab2:
                 st.session_state.last_unit = current_unit
 
         impl_unit = st.radio("Implementation Duration Unit:", ["Weeks", "Months"], horizontal=True, key="unit_choice", on_change=convert_duration)
-        impl_duration = st.number_input(f"Duration ({impl_unit})", key="dur_key", step=0.1)
-        impl_factor = (52 - impl_duration)/52 if impl_unit == "Weeks" else (12 - impl_duration)/12
+        max_dur = 52.0 if impl_unit == "Weeks" else 12.0
+        impl_duration = st.number_input(f"Duration ({impl_unit})", key="dur_key", step=0.1, min_value=0.0, max_value=max_dur)
+        impl_factor = (max_dur - impl_duration)/max_dur
         
         st.subheader("Client Internal Team")
         key_users = st.number_input("Number of Key Users Dedicated to the Project", value=5)
@@ -140,25 +141,39 @@ with tab2:
         client_internal_investment = (key_users * intensity_map[impl_intensity] * hourly_rate_pp)
         st.info(f"Estimated Client Investment (Shadow Cost): ${client_internal_investment:,.0f}")
         
-        # ADDED HELP TOOLTIP FOR WACC
         wacc = st.slider(
             "Discount Rate / Weighted Average Cost of Capital (WACC) %", 
             5, 15, 10, 
-            help="Weighted Average Cost of Capital: The hurdle rate used to discount future cash flows. Represents the minimum return an organization expects to offset the cost of funding and risk."
+            help="Weighted Average Cost of Capital hurdle rate."
         )
 
     y1_investment_total = initial_setup + client_internal_investment + y1_recurring
 
 # =================================================================
-# TAB 3: ROI REPORT
+# TAB 3: ROI REPORT (Fixed Heatmap with Bold Intersect)
 # =================================================================
 with tab3:
+    if annual_salary <= 0:
+        st.warning("⚠️ Please provide an **Avg. Annual Salary** in Tab 1.")
+        st.stop()
+
     st.header("📈 ROI Report & Targeter")
     
+    def calc_npv_logic(eff_multiplier, current_wacc):
+        test_pct = final_calc_pct * eff_multiplier
+        c_savings = []
+        for yr in range(1, analysis_years + 1):
+            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / max(total_annual_hours_pp, 1)
+            yr_sav = (total_annual_hours_pp * test_pct * num_employees) * (improvement_target/100) * yr_rate
+            c_savings.append(yr_sav * impl_factor if yr == 1 else yr_sav)
+        c_invest = [-y1_investment_total] + ([-steady_state_recurring] * (analysis_years - 1))
+        return sum((c_savings[k] + c_invest[k]) / (1+(current_wacc/100))**(k+1) for k in range(analysis_years))
+
     def get_be_years(in_waste_pct):
+        if in_waste_pct <= 0: return 0.0
         s, i = [], []
         for yr in range(1, analysis_years + 1):
-            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
+            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / max(total_annual_hours_pp, 1)
             yr_sav = (total_annual_hours_pp * in_waste_pct * num_employees) * (improvement_target/100) * yr_rate
             if yr == 1:
                 s.append(yr_sav * impl_factor)
@@ -169,7 +184,7 @@ with tab3:
         cum_cf = np.cumsum(np.array(s) + np.array(i))
         for idx in range(len(cum_cf)):
             if cum_cf[idx] >= 0:
-                if idx == 0: return y1_investment_total / (s[0]) if s[0] > 0 else 0
+                if idx == 0: return y1_investment_total / s[0] if s[0] > 0 else 0
                 prev_cum = cum_cf[idx-1]
                 net_now = (s[idx] + i[idx])
                 return idx + (abs(prev_cum) / net_now) if net_now > 0 else idx
@@ -184,19 +199,19 @@ with tab3:
         cumulative_investment = y1_investment_total + (steady_state_recurring * (target_yrs - 1))
         weight_sum = 0
         for yr in range(1, int(math.ceil(target_yrs)) + 1):
-            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
+            yr_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / max(total_annual_hours_pp, 1)
             yr_weight = total_annual_hours_pp * num_employees * (improvement_target/100) * yr_rate
             if yr == 1: weight_sum += yr_weight * impl_factor
             elif yr < target_yrs: weight_sum += yr_weight
             else: weight_sum += yr_weight * (target_yrs - (yr - 1))
         
-        final_calc_pct = cumulative_investment / weight_sum if weight_sum > 0 else 0
+        final_calc_pct = cumulative_investment / max(weight_sum, 1)
         target_hrs_pw_person = final_calc_pct * (daily_hours * 5)
         st.markdown(f'<div style="background-color:rgba(30,144,255,0.1); border-left:5px solid #1E90FF; padding:20px; border-radius:5px; margin-bottom:25px;"><span style="font-size:22px; font-weight:bold; color:#1E90FF;">Target identified: Address {target_hrs_pw_person:.2f} productive hours / week per person.</span></div>', unsafe_allow_html=True)
 
     savings, investments = [], []
     for yr in range(1, analysis_years + 1):
-        yr_hourly_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / total_annual_hours_pp
+        yr_hourly_rate = (burdened_cost_pp * ((1 + escalation_rate/100) ** (yr - 1))) / max(total_annual_hours_pp, 1)
         yr_saving = (total_annual_hours_pp * final_calc_pct * num_employees) * (improvement_target/100) * yr_hourly_rate
         if yr == 1:
             savings.append(yr_saving * impl_factor)
@@ -213,30 +228,26 @@ with tab3:
     total_sub_cost = y1_recurring + (steady_state_recurring * (analysis_years - 1))
     total_tco = total_sub_cost + initial_setup + client_internal_investment
     annual_hrs = total_annual_hours_pp * final_calc_pct * (improvement_target/100) * num_employees
-    fte_reclaimed = math.floor((annual_hrs / total_annual_hours_pp) * 10) / 10.0
-    npv_val = sum(val / (1+(wacc/100))**(i+1) for i, val in enumerate(df['Net Cash Flow']))
+    fte_reclaimed = math.floor((annual_hrs / max(total_annual_hours_pp, 1)) * 10) / 10.0
+    
+    expected_npv = calc_npv_logic(1.0, wacc)
+    downside_npv = calc_npv_logic(0.8, wacc)
+    upside_npv = calc_npv_logic(1.2, wacc)
+    risk_adj_npv = (expected_npv * 0.60) + (downside_npv * 0.25) + (upside_npv * 0.15)
 
     st.subheader("Total Investment Summary (TCO)")
+    i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
     if investment_strategy == "Pre-existing Solution Upgrade":
-        i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
         i1.metric("1st Yr Uplift", f"${y1_recurring:,.0f}")
-        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
-        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
-        i4.metric("Implementation Services", f"${initial_setup:,.0f}")
-        i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
-        i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i7.metric("Break Even", f"{final_be:.1f} Yrs")
-        i8.metric("Net Present Value (NPV)", f"${npv_val:,.0f}")
     else:
-        i1, i2, i3, i4, i5, i6, i7, i8 = st.columns(8)
         i1.metric("Year 1 Subscription", f"${y1_recurring:,.0f}")
-        i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
-        i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
-        i4.metric("Implementation Services", f"${initial_setup:,.0f}")
-        i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
-        i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
-        i7.metric("Break Even", f"{final_be:.1f} Yrs")
-        i8.metric("Net Present Value (NPV)", f"${npv_val:,.0f}")
+    i2.metric("Annual Subscription", f"${steady_state_recurring:,.0f}")
+    i3.metric("Total Subscription", f"${total_sub_cost:,.0f}")
+    i4.metric("Implementation Services", f"${initial_setup:,.0f}")
+    i5.metric("Client Investment", f"${client_internal_investment:,.0f}")
+    i6.metric("TOTAL TCO", f"${total_tco:,.0f}")
+    i7.metric("Break Even", f"{final_be:.1f} Yrs" if final_be > 0 else "Beyond Horizon")
+    i8.metric("Risk-Adjusted NPV", f"${risk_adj_npv:,.0f}")
     st.divider()
 
     st.subheader("Efficiency & Value Realization")
@@ -248,13 +259,13 @@ with tab3:
     st.divider()
 
     st.subheader("🏛️ Strategic Analysis: Board-Level Overview")
-    npv_status = "POSITIVE" if npv_val > 0 else "NEGATIVE"
-    recommendation = "STRATEGICALLY VIABLE" if npv_val > 0 else "REQUIRES OPTIMIZATION"
+    npv_status = "POSITIVE" if risk_adj_npv > 0 else "NEGATIVE"
+    recommendation = "STRATEGICALLY VIABLE" if risk_adj_npv > 0 else "REQUIRES OPTIMIZATION"
 
-    if npv_val < 0:
-        viability_text = f"This {npv_status} Net Present Value indicates that the current scope of automation must be either expanded to recover more latent waste or the subscription costs must be aligned with the anticipated yield of the transformation."
+    if risk_adj_npv < 0:
+        viability_text = f"This {npv_status} Risk-Adjusted Net Present Value indicates that the current scope of automation must be either expanded to recover more latent waste or costs must be aligned with yield."
     else:
-        viability_text = f"This {npv_status} Net Present Value signifies that the productivity dividends, when discounted at a {wacc:.1f}% cost of capital, outperform the total investment cost."
+        viability_text = f"This {npv_status} Risk-Adjusted Net Present Value signifies that the productivity dividends, when discounted and risk-weighted, outperform the total investment cost."
 
     industry_impact = {
         "Retail": "improved operational resilience and decision velocity in omni-channel environments.",
@@ -262,17 +273,68 @@ with tab3:
         "Manufacturing": "enhanced production synchronization and reduced lead-time volatility."
     }
 
-    financial_viability = f'<div style="color:{"#2E7D32" if npv_val > 0 else "#D32F2F"}; margin-bottom:20px;"><b>{"✅" if npv_val > 0 else "⚠️"} Financial Viability: {npv_status} NPV</b><br>The investment yields a <b>{npv_status} NPV of ${npv_val:,.0f}</b>, confirming that the project <b>{recommendation}</b>. {viability_text} As a "Go" decision, this project serves as a foundational step; while this model captures labor efficiency, it creates the operational "headroom" necessary to unlock secondary hard savings in inventory reduction and margin performance.</div>'
+    financial_viability = f'<div style="background-color:rgba(128,128,128,0.05); border-left:4px solid #1f77b4; padding:20px; border-radius:8px; margin-bottom:20px;"><div style="color:{"#2E7D32" if risk_adj_npv > 0 else "#D32F2F"}; margin-bottom:10px;"><b>{"✅" if risk_adj_npv > 0 else "⚠️"} Financial Viability: {npv_status} RISK-ADJUSTED NPV</b><br>The investment yields a <b>Risk-Adjusted NPV of ${risk_adj_npv:,.0f}</b>, confirming that the project is <b>{recommendation}</b>.</div> {viability_text} This pro-active weighting ensures that our business case remains defensible even under conservative implementation outcomes.</div>'
 
     summary_html = (
         f'<div style="border:1px solid rgba(128,128,128,0.3); padding:30px; border-radius:10px; font-family:\'Segoe UI\',sans-serif; line-height:1.8;">'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Strategic Project Overview</b><br>'
-        f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive solution</b> powered by <b>Blue Yonder\'s {solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>autonomous "exception-only" management</b>, ensuring human capital is focused on high-impact strategic trade-offs.</div>'
+        f'This initiative targets a TCO of <b>${total_tco:,.0f}</b> over a <b>{analysis_years}-year horizon</b>. Beyond a simple software deployment, this represents a transition to a <b>Cognitive solution</b> powered by <b>Blue Yonder\'s {solution_name}</b>. By embedding AI and ML into daily workflows, the organization shifts from reactive manual planning to <b>_autonomous "exception-only" management_</b>.</div>'
         f'<div style="margin-bottom:20px;"><b style="text-transform:uppercase;">Capacity Realization (Shadow Capacity)</b><br>'
-        f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b> without escalating recruitment or payroll liabilities. This "Shadow Capacity" acts as a <b>Volume Multiplier</b>, directly enabling {industry_impact[industry]}</div>'
+        f'The implementation reclaims <b>{annual_hrs:,.0f} productive hours annually</b>: the financial and operational equivalent of adding <b>{fte_reclaimed} staff members</b>. This "Shadow Capacity" acts as a <b>Volume Multiplier</b>, directly enabling {industry_impact[industry]}</div>'
         f'<hr style="border:0; border-top:1px solid rgba(128,128,128,0.3); margin:25px 0;">{financial_viability}</div>'
     )
     st.markdown(summary_html, unsafe_allow_html=True)
+
+    # --- SENSITIVITY HEATMAP (Logic-Based Text Bolding) ---
+    st.subheader("🎯 Sensitivity Analysis: NPV Variance")
+    with st.expander("📊 View NPV Sensitivity Matrix (Efficiency vs. WACC)"):
+        eff_variants = [0.8, 0.9, 1.0, 1.1, 1.2] 
+        wacc_variants = [wacc-4, wacc-2, wacc, wacc+2, wacc+4]
+        matrix_data = []
+        text_data = [] # Array to store the formatted labels
+        base_hrs_reclaimed = final_calc_pct * (daily_hours * 5)
+
+        for e_var in eff_variants:
+            row_vals = []
+            row_text = []
+            for w_var in wacc_variants:
+                val = calc_npv_logic(e_var, w_var)
+                row_vals.append(val)
+                
+                # Format the number as 'k' or 'M'
+                if abs(val) >= 1_000_000:
+                    display_text = f"{val/1_000_000:.1f}M"
+                else:
+                    display_text = f"{val/1_000:.0f}k"
+                
+                # FEATURE: Bold and Annotate the Golden Intersect (100% Efficiency + Selected WACC)
+                if round(e_var, 1) == 1.0 and w_var == wacc:
+                    row_text.append(f"🎯 <b>{display_text}</b>")
+                else:
+                    row_text.append(display_text)
+            
+            matrix_data.append(row_vals)
+            text_data.append(row_text)
+
+        y_labels = [f"{int(ev*100)}% ({base_hrs_reclaimed * ev:.1f} hrs)" for ev in eff_variants]
+        x_labels = [f"{w}%" for w in wacc_variants]
+
+        fig_heat = px.imshow(
+            matrix_data,
+            labels=dict(x="WACC (%)", y="Efficiency Achievement (%)", color="NPV ($)"),
+            x=x_labels, y=y_labels,
+            color_continuous_scale="RdYlGn",
+            aspect="auto"
+        )
+        
+        # Apply the bold/annotated text labels directly to the heatmap
+        fig_heat.update_traces(
+            text=text_data,
+            texttemplate="%{text}",
+            textfont=dict(size=14)
+        )
+
+        st.plotly_chart(fig_heat, use_container_width=True)
 
     with st.expander("📝 Professional Glossary & Blue Yonder Strategic Alignment"):
         st.write("**Net Present Value (NPV) Analysis:** NPV calculates the total excess value generated by an investment after accounting for the time value of money and the cost of capital.")
@@ -286,7 +348,7 @@ with tab3:
     chart_view = st.radio("Chart View:", ["Cumulative ROI", "Annual Net ROI"], horizontal=True)
     fig = go.Figure()
     if chart_view == "Cumulative ROI":
-        fig.add_trace(go.Scatter(x=df["Period"], y=df["Cumulative Cash Flow"], mode='lines+markers', line=dict(color='#1f77b4', width=4), fill='tozeroy'))
+        fig.add_trace(go.Scatter(x=df["Period"], y=df["Cumulative Cash Flow"], mode='markers+lines', line=dict(color='#1f77b4', width=4), fill='tozeroy'))
     else:
         fig.add_trace(go.Bar(x=df["Period"], y=df["Net Cash Flow"], marker_color='#1f77b4'))
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.3)
